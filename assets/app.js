@@ -673,19 +673,29 @@ function wireResolver({ urlSel, statusSel, nameSel, posSel, mapKey }) {
     }
 
     const nameEl = $(nameSel), posEl = $(posSel);
-    const filled = [];
-    if (r.name && nameEl && !nameEl.value.trim()) { nameEl.value = r.name; filled.push("이름"); }
+    let gotName = false, gotPos = false;
+
+    // 에어비앤비처럼 이름 대신 설명문이 오는 곳이 있어서 걸러냅니다.
+    // ("펜션 · 강릉시 · ★5.0 · 침실 1개 · 침대 2개 …" 같은 것)
+    const usableName = s =>
+      s && s.length <= 25 && !/★/.test(s) && !/\d\s*개/.test(s) &&
+      (s.match(/·/g) || []).length < 2;
+
+    if (usableName(r.name) && nameEl && !nameEl.value.trim()) {
+      nameEl.value = r.name;
+      gotName = true;
+    }
     if (r.lat != null && r.lng != null && posEl) {
       posEl.value = `${r.lat}, ${r.lng}`;
-      filled.push("위치");
+      gotPos = true;
       if (maps[mapKey]) maps[mapKey].showPick(r.lat, r.lng);
     }
-    setStatus(
-      filled.length
-        ? `${filled.join("·")}을 찾았어요${r.address ? " — " + r.address : ""}`
-        : "위치를 못 찾았어요. 지도에서 찍어주세요.",
-      filled.length ? "ok" : "bad"
-    );
+
+    const where = r.address ? " — " + r.address : "";
+    if (gotName && gotPos)  setStatus("이름과 위치를 넣었어요" + where, "ok");
+    else if (gotPos)        setStatus("위치를 넣었어요. 이름은 직접 적어주세요." + where, "ok");
+    else if (gotName)       setStatus("이름만 찾았어요. 위치는 지도에서 찍어주세요.", "bad");
+    else                    setStatus("위치를 못 찾았어요. 지도에서 찍어주세요.", "bad");
   }
 
   urlEl.addEventListener("change", run);
