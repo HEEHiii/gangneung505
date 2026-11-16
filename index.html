@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>505 강릉여행</title>
+<meta name="description" content="친구들과 함께 정하는 강릉여행 숙소와 일정">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+      crossorigin="anonymous" referrerpolicy="no-referrer">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<!-- ───────────── 비밀번호 게이트 ───────────── -->
+<section id="gate">
+  <div class="gate-box">
+    <p class="gate-eyebrow">GANGNEUNG</p>
+    <h1 class="gate-title">505 강릉여행</h1>
+    <p class="gate-sub" id="gate-sub"></p>
+    <form id="gate-form" autocomplete="off">
+      <label class="sr-only" for="gate-input">비밀번호</label>
+      <input id="gate-input" type="password" inputmode="numeric"
+             placeholder="비밀번호" maxlength="12" autocomplete="off">
+      <button type="submit">입장</button>
+    </form>
+    <p class="gate-error" id="gate-error" role="alert" aria-live="polite"></p>
+  </div>
+</section>
+
+<!-- ───────────── 본문 ───────────── -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <strong>505 강릉여행</strong>
+        <span id="trip-range"></span>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="페이지">
+      <a href="#stay"     data-tab="stay">숙소</a>
+      <a href="#plan"     data-tab="plan">일정</a>
+      <a href="#money"    data-tab="money">경비</a>
+      <a href="#food"     data-tab="food">맛집</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- 숙소 -->
+    <section class="panel" id="panel-stay">
+      <div class="panel-head">
+        <h2>숙소 후보</h2>
+        <p class="muted" id="stay-count"></p>
+      </div>
+
+      <div class="layout">
+        <div class="map-col">
+          <div class="map-wrap">
+            <div id="map-stay" class="map"></div>
+            <div class="map-legend" role="group" aria-label="지도 표시">
+              <button type="button" data-filter="all" class="on">전부</button>
+              <button type="button" data-filter="lodging">숙소만</button>
+              <button type="button" data-filter="spot">관광지만</button>
+            </div>
+          </div>
+          <p class="map-hint muted">파란 번호 핀이 숙소, 회색 점이 해변·관광지예요. 카드를 누르면 지도가 따라갑니다.</p>
+        </div>
+
+        <div class="list-col">
+          <div id="vote-note" class="note" hidden></div>
+          <ul class="cards" id="lodging-list"></ul>
+
+          <details class="adder" id="add-lodging">
+            <summary>+ 숙소 후보 추가하기</summary>
+            <form class="adder-form" id="form-lodging">
+              <label>숙소 이름
+                <input id="al-name" required maxlength="30" placeholder="예: 오붓한강릉">
+              </label>
+              <label>예약 링크
+                <input id="al-url" type="url" required placeholder="https://...">
+              </label>
+              <label>위치 <span class="opt">(선택)</span>
+                <div class="pickrow">
+                  <input id="al-pos" inputmode="decimal" placeholder="37.7743, 128.9444">
+                  <button type="button" class="btn-pick" data-pick="al-pos" data-map="stay">지도에서 찍기</button>
+                </div>
+              </label>
+              <label>메모 <span class="opt">(선택)</span>
+                <input id="al-note" maxlength="60" placeholder="예: 경포해변 도보 5분">
+              </label>
+              <div class="adder-actions">
+                <button type="submit">추가</button>
+                <p class="muted">위치를 비워두면 지도에 핀이 안 생기고 거리도 안 나와요.</p>
+              </div>
+            </form>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- 일정 -->
+    <section class="panel" id="panel-plan" hidden>
+      <div class="panel-head">
+        <h2>일정표</h2>
+        <p class="muted">아무나 바로 고칠 수 있어요. 칸을 눌러 쓰면 자동으로 저장됩니다.</p>
+      </div>
+      <div class="plan-bar">
+        <div id="plan-status" class="save-status" aria-live="polite"></div>
+        <button type="button" id="plan-reset" class="btn-quiet">처음 상태로 되돌리기</button>
+      </div>
+      <div id="itinerary"></div>
+    </section>
+
+    <!-- 경비 -->
+    <section class="panel" id="panel-money" hidden>
+      <div class="panel-head">
+        <h2>경비 정산</h2>
+        <p class="muted">쓴 돈을 적으면 1인당 얼마인지, 누가 누구에게 보내야 하는지 계산해줍니다.</p>
+      </div>
+
+      <form class="expense-form" id="expense-form">
+        <div class="row">
+          <label>항목<input id="ex-item" placeholder="예: 숙소비" required maxlength="30"></label>
+          <label>금액<input id="ex-amount" type="number" inputmode="numeric" min="0" step="100" placeholder="0" required></label>
+        </div>
+        <div class="row">
+          <label>결제한 사람<input id="ex-payer" placeholder="예: 민수" required maxlength="12"></label>
+          <button type="submit">추가</button>
+        </div>
+      </form>
+
+      <div id="expense-summary" class="summary"></div>
+      <ul class="expense-list" id="expense-list"></ul>
+      <div id="settlement" class="settlement"></div>
+    </section>
+
+    <!-- 맛집 -->
+    <section class="panel" id="panel-food" hidden>
+      <div class="panel-head">
+        <h2>맛집 · 카페</h2>
+        <p class="muted">가보고 싶은 곳을 지도에 모아뒀어요.</p>
+      </div>
+      <div class="layout">
+        <div class="map-col">
+          <div class="map-wrap"><div id="map-food" class="map"></div></div>
+          <p class="map-hint muted">꽉 찬 핀이 식당, 속이 빈 핀이 카페예요.</p>
+        </div>
+        <div class="list-col">
+          <div class="chips" id="food-filters"></div>
+          <ul class="cards" id="food-list"></ul>
+
+          <details class="adder" id="add-food">
+            <summary>+ 가고 싶은 곳 추가하기</summary>
+            <form class="adder-form" id="form-food">
+              <label>이름
+                <input id="af-name" required maxlength="30" placeholder="예: 테라로사 커피공장">
+              </label>
+              <label>분류
+                <select id="af-cat">
+                  <option value="food">식당</option>
+                  <option value="cafe">카페</option>
+                </select>
+              </label>
+              <label>위치 <span class="opt">(선택)</span>
+                <div class="pickrow">
+                  <input id="af-pos" inputmode="decimal" placeholder="37.7743, 128.9444">
+                  <button type="button" class="btn-pick" data-pick="af-pos" data-map="food">지도에서 찍기</button>
+                </div>
+              </label>
+              <label>메모 <span class="opt">(선택)</span>
+                <input id="af-note" maxlength="60" placeholder="예: 웨이팅 길어요">
+              </label>
+              <div class="adder-actions">
+                <button type="submit">추가</button>
+                <p class="muted">위치를 비워두면 목록에만 들어가요.</p>
+              </div>
+            </form>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>지도 © OpenStreetMap 기여자</p>
+  </footer>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="assets/data.js"></script>
+<script src="assets/store.js"></script>
+<script src="assets/map.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
