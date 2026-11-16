@@ -9,6 +9,10 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 /* 저장소에서 읽어온 공유 상태 */
 const state = { counts: {}, mine: [], expenses: [], items: [], docs: {}, loaded: false };
 
+/* 지금 지도에서 들여다보고 있는 것 (같은 걸 또 누르면 전체 보기로 돌아갑니다) */
+let selectedLodgingId = null;
+let selectedFoodId = null;
+
 /* ───────── 작은 도구들 ───────── */
 const won = n => Number(n || 0).toLocaleString("ko-KR") + "원";
 
@@ -275,16 +279,35 @@ function renderLodgings() {
     </li>`;
   }).join("");
 
+  // 목록이 바뀌어 사라진 카드를 고른 상태로 남겨두지 않기
+  if (selectedLodgingId && !list.some(d => d.id === selectedLodgingId)) selectedLodgingId = null;
+  if (selectedLodgingId) {
+    const c = $(`#lodging-list .card[data-id="${CSS.escape(selectedLodgingId)}"]`);
+    if (c) c.classList.add("sel");
+  }
+
   paintVotes();
 }
 
 function selectLodging(id, fromCard) {
+  // 이미 보고 있던 숙소를 또 누르면 전체 지도로 돌아갑니다
+  if (selectedLodgingId === id) return clearLodgingSelection();
+
+  selectedLodgingId = id;
   $$("#lodging-list .card").forEach(c => c.classList.toggle("sel", c.dataset.id === id));
   maps.stay.select(id, true);
   if (!fromCard) {
     const card = $(`#lodging-list .card[data-id="${CSS.escape(id)}"]`);
     if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
   }
+}
+
+function clearLodgingSelection() {
+  selectedLodgingId = null;
+  $$("#lodging-list .card").forEach(c => c.classList.remove("sel"));
+  if (!maps.stay) return;
+  maps.stay.clearSelect();
+  maps.stay.fit();
 }
 
 function paintVotes() {
@@ -568,8 +591,11 @@ function initFood() {
     if (e.target.closest("a")) return;          // 링크는 그대로 열리게
     const card = e.target.closest(".card");
     if (!card) return;
+    // 이미 보고 있던 곳을 또 누르면 전체 지도로 돌아갑니다
+    if (selectedFoodId === card.dataset.fid) return clearFoodSelection();
+    selectedFoodId = card.dataset.fid;
     $$("#food-list .card").forEach(c => c.classList.toggle("sel", c === card));
-    maps.food.goTo(card.dataset.fid);
+    maps.food.goTo(selectedFoodId);
   });
 
   $("#form-food").addEventListener("submit", async e => {
@@ -613,6 +639,14 @@ function initFood() {
   renderFood();
 }
 
+function clearFoodSelection() {
+  selectedFoodId = null;
+  $$("#food-list .card").forEach(c => c.classList.remove("sel"));
+  if (!maps.food) return;
+  maps.food.clearSelect();
+  maps.food.fitPoints();
+}
+
 function renderFood() {
   const list = allFoods().filter(f => foodCat === "all" || f.cat === foodCat);
 
@@ -642,6 +676,14 @@ function renderFood() {
 
   maps.food.setPoints(list.filter(f => f.lat != null && f.lng != null));
   maps.food.refresh();
+
+  // 분류를 바꾸면 보던 곳이 목록에서 빠질 수 있습니다
+  if (selectedFoodId && !list.some(f => f.id === selectedFoodId)) selectedFoodId = null;
+  if (selectedFoodId) {
+    const c = $(`#food-list .card[data-fid="${CSS.escape(selectedFoodId)}"]`);
+    if (c) c.classList.add("sel");
+  }
+
   paintVotes();
 }
 

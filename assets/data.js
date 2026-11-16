@@ -23,11 +23,11 @@ const LODGINGS = [
   {
     id: "l1",
     name: "오붓한강릉",
-    url: "https://m.place.naver.com/accommodation/1523779067/room?entry=plt&businessCategory=pension&level=top&guest=4&checkin=20270123&checkout=20270124",
-    lat: 37.8255, lng: 128.8560, approx: true,
-    area: "사천면 방동리",
+    url: "https://naver.me/5xjphLSt",
+    lat: 37.8250, lng: 128.8780, approx: true,
+    area: "사천면 가둔지길 24 (방동리)",
     capacity: "", price: "",
-    note: "사천해변 근처. 소나무 뷰로 알려진 곳.",
+    note: "사천해변 도보권. 소나무 뷰로 알려진 곳.",
   },
   {
     id: "l2",
@@ -92,12 +92,9 @@ const SPOTS = [
    초안입니다. 가보고 싶은 곳을 자유롭게 추가·삭제하세요.
    좌표는 모두 대략이라 지도에서 보고 맞춰주세요. */
 const FOODS = [
-  { id:"f1", name:"테라로사 커피공장",  cat:"cafe", lat:37.6878, lng:128.8686, approx:true, note:"구정면. 강릉 커피의 시작점" },
-  { id:"f2", name:"보헤미안 박이추커피", cat:"cafe", lat:37.8560, lng:128.8300, approx:true, note:"연곡. 핸드드립" },
-  { id:"f3", name:"산토리니",          cat:"cafe", lat:37.7745, lng:128.9470, approx:true, note:"안목 커피거리 오션뷰" },
-  { id:"f4", name:"초당할머니순두부",    cat:"food", lat:37.7900, lng:128.9105, approx:true, note:"초당동 순두부" },
-  { id:"f5", name:"엄지네포장마차",      cat:"food", lat:37.7630, lng:128.8970, approx:true, note:"꼬막비빔밥. 웨이팅 김" },
-  { id:"f6", name:"교동짬뽕",          cat:"food", lat:37.7700, lng:128.8820, approx:true, note:"강릉 짬뽕 터줏대감" },
+  // 비워뒀습니다 — 친구들이 페이지에서 직접 추가합니다.
+  // 꼭 미리 넣어두고 싶은 곳이 있으면 아래 형식으로 적으세요.
+  // { id:"f1", name:"테라로사", cat:"cafe", lat:37.6878, lng:128.8686, note:"메모", url:"https://..." },
 ];
 
 const FOOD_CATS = [

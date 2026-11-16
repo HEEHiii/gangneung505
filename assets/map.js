@@ -52,7 +52,8 @@ function createMap(elId, opts = {}) {
   const lodgingLayer = L.layerGroup().addTo(map);
   const spotLayer = L.layerGroup().addTo(map);
   const markers = {};          // id -> marker
-  let bounds = null;
+  let bounds = null;        // 숙소 전체가 들어오는 범위
+  let pointBounds = null;   // 맛집 전체가 들어오는 범위
 
   function lodgingIcon(no, selected) {
     return L.divIcon({
@@ -143,7 +144,8 @@ function createMap(elId, opts = {}) {
         markers[s.id] = { marker: m, no: 0 };
         pts.push([s.lat, s.lng]);
       });
-      if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.25));
+      pointBounds = pts.length ? L.latLngBounds(pts).pad(0.25) : null;
+      if (pointBounds) map.fitBounds(pointBounds);
     },
 
     /* 맛집 카드 클릭 → 지도 이동 */
@@ -175,7 +177,17 @@ function createMap(elId, opts = {}) {
       }
     },
 
+    /* 전체 보기로 되돌리기 */
     fit() { if (bounds) map.fitBounds(bounds); },
+    fitPoints() { if (pointBounds) map.fitBounds(pointBounds); },
+
+    /* 고른 것 해제 — 핀 강조와 말풍선을 되돌립니다 */
+    clearSelect() {
+      Object.entries(markers).forEach(([, { marker, no }]) => {
+        if (no) marker.setIcon(lodgingIcon(no, false));   // 숙소 핀만 강조 상태가 있음
+      });
+      map.closePopup();
+    },
 
     /* ---------- 지도에서 위치 찍기 ----------
        좌표를 모르는 친구도 지도를 눌러 위치를 정할 수 있게. */
