@@ -152,6 +152,32 @@ const Store = (() => {
       await call({ type: "item-del" }, { id });
     },
 
+    /* ---------- 링크에서 이름·좌표 알아내기 ----------
+       브라우저는 CORS 때문에 네이버·에어비앤비를 직접 못 읽습니다.
+       앱스 스크립트(구글 서버)가 대신 읽어서 돌려줍니다.
+       반환: {lat, lng, name, address} 또는 {error} */
+    async resolveLink(url) {
+      if (!online) {
+        return { error: "구글 시트를 연결해야 링크 조회가 됩니다. 지도에서 찍어주세요." };
+      }
+      try {
+        const r = await call({ type: "resolve", url });
+        // 구버전 스크립트는 type=resolve 를 모르고 평소 데이터를 그대로 돌려줍니다.
+        // 그걸 알아채서 원인을 제대로 알려줍니다.
+        if (r && r.lat == null && (r.counts !== undefined || r.docs !== undefined)) {
+          return { error: "앱스 스크립트를 새 버전으로 배포해야 링크 조회가 됩니다 (SETUP.md 참고). 지금은 지도에서 찍어주세요." };
+        }
+        return r;
+      } catch (err) {
+        // call() 은 서버가 보낸 error 메시지를 그대로 던집니다.
+        // 그 설명이 더 쓸모 있으니 살려서 돌려줍니다.
+        const msg = String((err && err.message) || "");
+        return { error: msg && !/HTTP|fetch|abort/i.test(msg)
+          ? msg
+          : "조회에 실패했어요. 지도에서 찍어주세요." };
+      }
+    },
+
     /* ---------- 일정표처럼 통째로 저장되는 것 ---------- */
     async setDoc(key, data) {
       if (!online) {

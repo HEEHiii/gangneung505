@@ -31,21 +31,21 @@ const LODGINGS = [
   },
   {
     id: "l2",
-    name: "스테이밤밤",
+    name: "강릉 스테이감사",
     url: "https://m.booking.naver.com/booking/3/bizes/1560719/items/7289621?area=plt&endDate=2027-01-24&lang=ko&startDate=2027-01-23&tab=book&theme=place",
-    lat: 37.7090, lng: 128.9570, approx: true,
-    area: "강동면 산성우리",
-    capacity: "기준 2인 / 최대 4인", price: "",
-    note: "밤나무에 둘러싸인 마당 있는 독채. 기준 인원 초과 시 1인 1박 2만원 추가.",
+    lat: 37.8092782, lng: 128.8989124, approx: false,
+    area: "안현동 하남길 345-9",
+    capacity: "", price: "",
+    note: "경포 북쪽. 체크인 15:00 / 체크아웃 11:00.",
   },
   {
     id: "l3",
-    name: "스테이감사야",
+    name: "스테이밤밤",
     url: "https://m.booking.naver.com/booking/3/bizes/839264/items/5036290?area=ple&endDate=2027-01-24&lang=ko&startDate=2027-01-23&tab=book&theme=place",
-    lat: 37.8115, lng: 128.8720, approx: true,
-    area: "하남길",
-    capacity: "", price: "",
-    note: "체크인 15:00 / 체크아웃 11:00.",
+    lat: 37.683616, lng: 129.0097488, approx: false,
+    area: "강동면 오이동길 17",
+    capacity: "기준 2인 / 최대 4인", price: "",
+    note: "정동진 쪽. 밤나무 숲 독채. 기준 인원 초과 시 1인 1박 2만원 추가.",
   },
   {
     id: "l4",
@@ -60,7 +60,7 @@ const LODGINGS = [
     id: "l5",
     name: "강릉 ease",
     url: "https://www.airbnb.co.kr/rooms/1746239649272238571?check_in=2027-01-23&check_out=2027-01-24&guests=4&adults=4",
-    lat: 37.7620, lng: 128.8960, approx: true,
+    lat: 37.7589, lng: 128.8987, approx: true,
     area: "강릉역 인근",
     capacity: "기준 4인 / 최대 6인", price: "",
     note: "강릉역 1번 출구 도보 10분. 실내 자쿠지, 퀸 침대 2개, 짐 보관 가능.",
@@ -104,6 +104,7 @@ const FOOD_CATS = [
   { key:"all",  label:"전부" },
   { key:"food", label:"식당" },
   { key:"cafe", label:"카페" },
+  { key:"spot", label:"관광" },
 ];
 
 /* ───────── 일정 ─────────

@@ -212,6 +212,9 @@ function initStay() {
     }
   });
 
+  wireResolver({ urlSel: "#al-url", statusSel: "#al-status",
+                 nameSel: "#al-name", posSel: "#al-pos", mapKey: "stay" });
+
   // 저장소를 기다리지 않고 기본 5곳을 바로 보여줍니다.
   // (안 그러면 2~3초 동안 빈 목록이 보입니다)
   renderLodgings();
@@ -285,7 +288,7 @@ function selectLodging(id, fromCard) {
 }
 
 function paintVotes() {
-  allLodgings().forEach(d => {
+  [...allLodgings(), ...allFoods()].forEach(d => {
     const n = state.counts[d.id] || 0;
     const el = $(`[data-count="${CSS.escape(d.id)}"]`);
     if (el) el.innerHTML = `<strong>${n}</strong>표`;
@@ -297,6 +300,7 @@ function paintVotes() {
       btn.setAttribute("aria-pressed", String(on));
     }
   });
+  renderRoutePreview();
 }
 
 async function onVote(id) {
@@ -370,6 +374,8 @@ function initPlan() {
       queuePlanSave();
     }
   });
+
+  $("#route-build").addEventListener("click", onBuildRoute);
 
   $("#plan-reset").addEventListener("click", async () => {
     if (!confirm("일정표를 처음 상태로 되돌릴까요? 적어둔 내용이 사라집니다.")) return;
@@ -557,6 +563,9 @@ function initFood() {
   $("#food-list").addEventListener("click", e => {
     const del = e.target.closest("[data-del]");
     if (del) { e.stopPropagation(); return onDeleteItem(del.dataset.del, "장소"); }
+    const voteBtn = e.target.closest("[data-vote]");
+    if (voteBtn) { e.stopPropagation(); return onVote(voteBtn.dataset.vote); }
+    if (e.target.closest("a")) return;          // 링크는 그대로 열리게
     const card = e.target.closest(".card");
     if (!card) return;
     $$("#food-list .card").forEach(c => c.classList.toggle("sel", c === card));
@@ -567,6 +576,7 @@ function initFood() {
     e.preventDefault();
     const name = $("#af-name").value.trim();
     const cat  = $("#af-cat").value;
+    const url  = $("#af-url").value.trim();
     const posText = $("#af-pos").value.trim();
     const note = $("#af-note").value.trim();
     if (!name) return toast("이름을 적어주세요");
@@ -581,7 +591,7 @@ function initFood() {
     btn.disabled = true;
     try {
       const item = await Store.addItem("food", {
-        name, cat, note,
+        name, cat, note, url,
         lat: pos ? pos.lat : null,
         lng: pos ? pos.lng : null,
       });
@@ -597,11 +607,16 @@ function initFood() {
     }
   });
 
+  wireResolver({ urlSel: "#af-url", statusSel: "#af-status",
+                 nameSel: "#af-name", posSel: "#af-pos", mapKey: "food" });
+
   renderFood();
 }
 
 function renderFood() {
   const list = allFoods().filter(f => foodCat === "all" || f.cat === foodCat);
+
+  const waiting = Store.online && !state.loaded;
 
   $("#food-list").innerHTML = list.length
     ? list.map(f => {
@@ -614,7 +629,12 @@ function renderFood() {
               : f.approx ? '<span class="badge">대략 위치</span>' : ""}${
               f.added ? '<span class="badge added">친구 추가</span>' : ""}</div>
             ${f.note ? `<div class="card-note">${esc(f.note)}</div>` : ""}
-            ${f.added ? `<div class="card-actions"><button class="btn-del" type="button" data-del="${esc(f.id)}" aria-label="${esc(f.name)} 삭제">삭제</button></div>` : ""}
+            <div class="card-actions">
+              ${f.url ? `<a class="btn-link" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">보기 ↗</a>` : ""}
+              <button class="btn-vote" type="button" data-vote="${esc(f.id)}"${waiting ? " disabled" : ""}>투표</button>
+              ${f.added ? `<button class="btn-del" type="button" data-del="${esc(f.id)}" aria-label="${esc(f.name)} 삭제">삭제</button>` : ""}
+              <span class="vote-count" data-count="${esc(f.id)}"><strong>0</strong>표</span>
+            </div>
           </div>
         </li>`;
       }).join("")
@@ -622,9 +642,139 @@ function renderFood() {
 
   maps.food.setPoints(list.filter(f => f.lat != null && f.lng != null));
   maps.food.refresh();
+  paintVotes();
 }
 
-/* ───────── 8. 지도에서 위치 찍기 (숙소·맛집 공용) ───────── */
+/* ───────── 8. 링크 붙여넣으면 이름·위치 자동으로 찾기 ─────────
+   브라우저에서 네이버·에어비앤비를 직접 읽는 건 CORS 때문에 불가능해서,
+   구글 앱스 스크립트가 서버에서 대신 읽어옵니다. */
+function wireResolver({ urlSel, statusSel, nameSel, posSel, mapKey }) {
+  const urlEl = $(urlSel), statusEl = $(statusSel);
+  if (!urlEl || !statusEl) return;
+  let lastTried = "";
+
+  const setStatus = (text, kind) => {
+    statusEl.textContent = text;
+    statusEl.className = "resolve-status" + (kind ? " " + kind : "");
+  };
+
+  async function run() {
+    const url = urlEl.value.trim();
+    if (!url || url === lastTried) return;
+    if (!/^https?:\/\//i.test(url)) return;
+    lastTried = url;
+
+    setStatus("이름과 위치를 찾는 중…", "busy");
+    const r = await Store.resolveLink(url);
+
+    if (!r || r.error) {
+      setStatus(r?.error || "못 찾았어요. 지도에서 찍어주세요.", "bad");
+      return;
+    }
+
+    const nameEl = $(nameSel), posEl = $(posSel);
+    const filled = [];
+    if (r.name && nameEl && !nameEl.value.trim()) { nameEl.value = r.name; filled.push("이름"); }
+    if (r.lat != null && r.lng != null && posEl) {
+      posEl.value = `${r.lat}, ${r.lng}`;
+      filled.push("위치");
+      if (maps[mapKey]) maps[mapKey].showPick(r.lat, r.lng);
+    }
+    setStatus(
+      filled.length
+        ? `${filled.join("·")}을 찾았어요${r.address ? " — " + r.address : ""}`
+        : "위치를 못 찾았어요. 지도에서 찍어주세요.",
+      filled.length ? "ok" : "bad"
+    );
+  }
+
+  urlEl.addEventListener("change", run);
+  urlEl.addEventListener("blur", run);
+  urlEl.addEventListener("paste", () => setTimeout(run, 60));
+}
+
+/* ───────── 9. 투표 결과로 경로 짜기 ───────── */
+const votesOf = id => state.counts[id] || 0;
+
+function topLodging() {
+  const list = allLodgings().filter(d => d.lat != null && d.lng != null);
+  if (!list.length) return null;
+  return list.reduce((best, d) => (votesOf(d.id) > votesOf(best.id) ? d : best), list[0]);
+}
+
+function votedPlaces() {
+  return allFoods()
+    .filter(f => f.lat != null && f.lng != null && votesOf(f.id) > 0)
+    .sort((a, b) => votesOf(b.id) - votesOf(a.id));
+}
+
+function renderRoutePreview() {
+  const box = $("#route-preview");
+  if (!box) return;
+  const lod = topLodging();
+  const places = votedPlaces();
+
+  if (!lod) {
+    box.innerHTML = '<p class="muted">위치가 있는 숙소가 없어요.</p>';
+    return;
+  }
+  box.innerHTML = `
+    <div class="route-pick">
+      <span class="route-k">숙소</span>
+      <strong>${esc(lod.name)}</strong>
+      <span class="muted">${votesOf(lod.id)}표${votesOf(lod.id) === 0 ? " · 아직 투표 없음" : " 최다"}</span>
+    </div>
+    <div class="route-pick">
+      <span class="route-k">들를 곳</span>
+      ${places.length
+        ? places.map(p => `<span class="route-chip">${esc(p.name)} <b>${votesOf(p.id)}</b></span>`).join("")
+        : '<span class="muted">맛집 탭에서 투표한 곳이 아직 없어요</span>'}
+    </div>`;
+}
+
+async function onBuildRoute() {
+  const lod = topLodging();
+  if (!lod) return toast("위치가 있는 숙소가 없어요");
+
+  const places = votedPlaces();
+  if (!places.length) toast("투표된 곳이 없어 숙소만으로 짭니다");
+
+  if (!confirm("지금 일정표를 새로 만듭니다. 적어둔 내용은 사라져요. 계속할까요?")) return;
+
+  const btn = $("#route-build"), note = $("#route-note");
+  btn.disabled = true;
+  note.className = "muted";
+  note.textContent = "이동시간 계산 중…";
+
+  try {
+    const st = SPOTS.find(s => s.name === "강릉역") ||
+               { name: "강릉역", lat: 37.7637, lng: 128.8990 };
+    const res = await buildItinerary({
+      lodging: { ...lod, cat: "lodging" },
+      places:  places.map(p => ({ ...p })),
+      station: { ...st, cat: "hub" },
+      trip:    currentItinerary(),
+    });
+
+    planDraft = res.itinerary;
+    renderPlan(true);
+    await savePlan();
+
+    note.textContent = res.real
+      ? `실제 주행시간 기준 · 이동 합계 약 ${res.totalMin}분`
+      : `길찾기 서버가 응답하지 않아 직선거리로 추정했어요 · 이동 합계 약 ${res.totalMin}분`;
+    note.className = res.real ? "muted" : "muted bad";
+    toast("일정을 새로 짰어요");
+  } catch (err) {
+    console.warn("경로 생성 실패", err);
+    note.textContent = "경로를 만들지 못했어요. 잠시 후 다시 눌러주세요.";
+    note.className = "muted bad";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ───────── 10. 지도에서 위치 찍기 (숙소·맛집 공용) ───────── */
 document.addEventListener("click", e => {
   const b = e.target.closest(".btn-pick");
   if (!b) return;
@@ -645,6 +795,6 @@ document.addEventListener("click", e => {
   });
 });
 
-/* ───────── 9. 시작 ─────────
+/* ───────── 11. 시작 ─────────
    모든 선언이 끝난 뒤에 게이트를 켭니다. (위 initGate 주석 참고) */
 initGate();

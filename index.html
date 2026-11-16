@@ -78,6 +78,7 @@
               <label>예약 링크
                 <input id="al-url" type="url" required placeholder="https://...">
               </label>
+              <p class="resolve-status" id="al-status">링크를 붙여넣으면 이름과 위치를 알아서 찾아봅니다.</p>
               <label>위치 <span class="opt">(선택)</span>
                 <div class="pickrow">
                   <input id="al-pos" inputmode="decimal" placeholder="37.7743, 128.9444">
@@ -107,6 +108,19 @@
         <div id="plan-status" class="save-status" aria-live="polite"></div>
         <button type="button" id="plan-reset" class="btn-quiet">처음 상태로 되돌리기</button>
       </div>
+      <section class="route-box">
+        <h3>투표 결과로 일정 짜기</h3>
+        <p class="muted">
+          1등 숙소와 표를 받은 곳들을, 실제 이동시간이 가장 짧은 순서로 묶어서 일정표에 넣습니다.
+          만들어진 뒤에도 칸을 눌러 자유롭게 고칠 수 있어요.
+        </p>
+        <div id="route-preview" class="route-preview"></div>
+        <div class="route-actions">
+          <button type="button" id="route-build">투표 결과로 일정 짜기</button>
+          <p class="muted" id="route-note"></p>
+        </div>
+      </section>
+
       <div id="itinerary"></div>
     </section>
 
@@ -158,8 +172,13 @@
                 <select id="af-cat">
                   <option value="food">식당</option>
                   <option value="cafe">카페</option>
+                  <option value="spot">관광</option>
                 </select>
               </label>
+              <label>링크 <span class="opt">(선택)</span>
+                <input id="af-url" type="url" placeholder="https://... 네이버 지도 공유링크">
+              </label>
+              <p class="resolve-status" id="af-status">링크를 붙여넣으면 이름과 위치를 알아서 찾아봅니다.</p>
               <label>위치 <span class="opt">(선택)</span>
                 <div class="pickrow">
                   <input id="af-pos" inputmode="decimal" placeholder="37.7743, 128.9444">
@@ -192,6 +211,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/store.js"></script>
 <script src="assets/map.js"></script>
+<script src="assets/route.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>
