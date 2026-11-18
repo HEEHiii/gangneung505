@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>지도 모듈 테스트 발판</title>
+<style>
+  #map { width: 600px; height: 320px; }
+  .stub-ov { display: inline-block; }
+</style>
+</head>
+<body>
+<!-- kakaomap.js 만 떼어내 눌러보는 발판입니다. 배포되지 않습니다. -->
+<div id="map"></div>
+
+<script type="module">
+  import { createMap, kakaoReady } from "/app/assets/kakaomap.js";
+
+  // 테스트가 드라이브할 수 있게 창에 올려둡니다
+  window.__createMap = createMap;
+  window.__kakaoReady = kakaoReady;
+  window.__picked = null;
+  window.__lastPickId = null;
+  window.__ready = true;
+</script>
+</body>
+</html>
