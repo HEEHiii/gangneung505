@@ -95,16 +95,31 @@
   };
 
   /* ---------- 장소 검색 ----------
-     테스트가 window.__stubPlaces 에 결과를 미리 꽂아둡니다. */
+     테스트가 window.__stubPlaces 에 결과를 미리 꽂아둡니다.
+
+     ★ bounds 를 실제로 반영합니다.
+       그래야 "지역 안에서 먼저 찾고, 없으면 전국으로 다시 찾는다"는
+       로직을 진짜로 확인할 수 있습니다. 범위를 무시하는 가짜였다면
+       그 분기가 테스트에서 통째로 빠집니다. */
+  function withinBounds(list, bounds) {
+    if (!bounds) return list;
+    const swLat = bounds.sw.getLat(), swLng = bounds.sw.getLng();
+    const neLat = bounds.ne.getLat(), neLng = bounds.ne.getLng();
+    return list.filter((r) => {
+      const lat = parseFloat(r.y), lng = parseFloat(r.x);
+      return lat >= swLat && lat <= neLat && lng >= swLng && lng <= neLng;
+    });
+  }
+
   function Places() {}
   Places.prototype.keywordSearch = function (q, cb, opts) {
     const all = (window.__stubPlaces && window.__stubPlaces.keyword) || {};
-    const hit = all[q] || all["*"] || [];
+    const hit = withinBounds(all[q] || all["*"] || [], opts && opts.bounds);
     setTimeout(() => cb(hit, hit.length ? Status.OK : Status.ZERO_RESULT, {}), 0);
   };
   Places.prototype.categorySearch = function (code, cb, opts) {
     const all = (window.__stubPlaces && window.__stubPlaces.category) || {};
-    const hit = all[code] || [];
+    const hit = withinBounds(all[code] || [], opts && opts.bounds);
     setTimeout(() => cb(hit, hit.length ? Status.OK : Status.ZERO_RESULT, {}), 0);
   };
 

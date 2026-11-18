@@ -32,6 +32,7 @@ step() {
 
 step "지역·POI 데이터"   node tests/regions.check.mjs
 step "순수 함수"         node tests/util.check.mjs
+step "링크 파싱"         node tests/places.check.mjs
 step "RPC 계약"          node tests/rpc-contract.check.mjs
 
 if [ -x /usr/lib/postgresql/16/bin/initdb ] || [ -n "${PGBIN:-}" ]; then
