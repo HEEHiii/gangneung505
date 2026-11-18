@@ -208,6 +208,9 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 .map{
   height:300px;border:1px solid var(--line);border-radius:var(--r);
   background:var(--surface-2);
+  /* 둥근 모서리가 지도 타일을 실제로 잘라내게 하고,
+     핀이 지도 밖으로 흘러나와 글을 덮는 일을 막습니다 */
+  overflow:hidden;
 }
 .map-legend{
   position:absolute;top:10px;right:10px;z-index:400;
@@ -754,3 +757,62 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
   .hero-title{font-size:32px}
   .wrap{padding-top:28px}
 }
+
+
+/* ============================================================
+   방 화면에서 새로 생긴 것들
+   ============================================================ */
+
+/* 게이트 아래 상태 안내 */
+.gate-note{margin:10px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+.gate-note code{
+  padding:1px 5px;border-radius:5px;font-size:11px;
+  background:var(--surface-2);border:1px solid var(--line);
+}
+
+/* 윗줄에 '방 설정' 버튼이 생겼습니다 */
+.topbar-inner{display:flex;align-items:center;gap:10px}
+.topbar-inner .brand{flex:1 1 auto;min-width:0}
+.topbar-inner .btn-quiet{flex:0 0 auto}
+
+/* 아직 안 열린 탭 */
+.soon{
+  margin:0 auto;max-width:520px;padding:28px 18px;text-align:center;
+  background:var(--surface);border:1px dashed var(--line-strong);border-radius:var(--r);
+}
+.soon strong{display:block;margin-bottom:10px;font-size:15px;color:var(--accent)}
+.soon p{margin:0 0 8px;font-size:14px;line-height:1.7}
+.soon p:last-child{margin-bottom:0}
+.soon .muted{color:var(--muted);font-size:13px}
+
+/* 추가 폼이 들어갈 자리 (JS 가 채웁니다) */
+.adder-slot{margin-top:12px}
+.adder-slot .field{margin-bottom:8px}
+.adder-slot .search-row button{padding:0 14px}
+.adder-slot .pick-list{margin-bottom:10px}
+
+/* 맛집 카드의 분류 꼬리표 */
+.badge.kind{
+  background:var(--surface-2);border-color:var(--line-strong);color:var(--muted);
+}
+
+/* 방 설정 창 */
+#owner-dlg{
+  width:min(92vw,420px);padding:0;border:0;border-radius:var(--r);
+  background:transparent;color:var(--text);
+}
+#owner-dlg::backdrop{background:rgba(0,0,0,.45)}
+.dlg-box{
+  padding:20px;background:var(--surface);
+  border:1px solid var(--line-strong);border-radius:var(--r);
+}
+.dlg-box .btn-primary{margin-bottom:4px}
+.dlg-box > .btn-quiet{width:100%;margin-top:12px;text-align:center}
+.dlg-sep{margin:18px 0;border:0;border-top:1px solid var(--line)}
+
+.btn-danger{
+  display:block;width:100%;padding:12px;font:inherit;font-size:15px;font-weight:700;
+  color:var(--on-dark);background:var(--danger);
+  border:0;border-radius:10px;cursor:pointer;
+}
+.btn-danger:focus-visible{outline:2px solid var(--text);outline-offset:2px}
