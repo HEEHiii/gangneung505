@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>장소 검색 테스트 발판</title></head>
+<body>
+<!-- places.js 를 떼어내 눌러보는 발판입니다. 배포되지 않습니다. -->
+<script type="module">
+  import * as places from "/app/assets/places.js";
+  import { REGIONS, regionByCode } from "/app/assets/regions.js";
+  window.P = places;
+  window.R = { REGIONS, regionByCode };
+  window.__ready = true;
+</script>
+</body>
+</html>

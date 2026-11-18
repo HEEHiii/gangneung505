@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>테마 테스트 발판</title>
+<link rel="stylesheet" href="/app/assets/style.css">
+</head>
+<body>
+<!-- 색 토큰을 실제로 계산된 값으로 확인하기 위한 발판입니다. 배포되지 않습니다. -->
+<main class="panel" style="padding:16px">
+  <h2 id="h">제목</h2>
+  <p id="body-text">본문 글씨</p>
+  <p class="muted" id="muted-text">흐린 설명</p>
+  <a href="#" id="link" style="color:var(--accent)">강조 링크</a>
+  <button id="primary" style="background:var(--accent);color:var(--on-dark);border:0;padding:8px 14px;border-radius:8px">주 버튼</button>
+  <div class="pin-lodging" id="pin"><span>1</span></div>
+  <div class="pin-spot" id="spot"></div>
+  <span class="pin-label" id="label">경포해변</span>
+  <div class="map-bubble-in" id="bubble">말풍선</div>
+  <div class="map map-off" id="mapoff" style="height:80px">
+    <div class="map-off-note"><strong>지도를 띄울 수 없어요</strong></div>
+  </div>
+</main>
+
+<script type="module">
+  import { seasonFor, THEMES } from "/app/assets/regions.js";
+  window.seasonFor = seasonFor;
+  window.THEMES = THEMES;
+  window.setTheme = (t) => {
+    if (t) document.documentElement.setAttribute("data-theme", t);
+    else document.documentElement.removeAttribute("data-theme");
+  };
+  window.cs = (sel, prop) =>
+    getComputedStyle(document.querySelector(sel)).getPropertyValue(prop).trim();
+  window.tok = (name) =>
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  window.__ready = true;
+</script>
+</body>
+</html>

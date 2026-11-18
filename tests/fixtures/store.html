@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>저장소 모듈 테스트 발판</title></head>
+<body>
+<!-- store.js / session.js / auth.js 를 떼어내 눌러보는 발판입니다. 배포되지 않습니다. -->
+<script type="module">
+  import * as store from "/app/assets/store.js";
+  import * as session from "/app/assets/session.js";
+  import * as auth from "/app/assets/auth.js";
+  import { hasBackend, hasMap, roomUrl } from "/app/assets/config.js";
+  import { RPC, NEEDS_LOGIN, toRpcError } from "/app/assets/supa.js";
+
+  window.S = store;
+  window.Sess = session;
+  window.A = auth;
+  window.C = { hasBackend, hasMap, roomUrl };
+  window.Supa = { RPC, NEEDS_LOGIN, toRpcError };
+  window.__ready = true;
+</script>
+</body>
+</html>

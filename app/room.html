@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>여행방</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<!-- ───────── 비밀번호 게이트 ───────── -->
+<section id="gate">
+  <div class="gate-box">
+    <p class="gate-eyebrow">같이 가는 여행</p>
+    <h1 class="gate-title" id="gate-title">여행방</h1>
+    <p class="gate-sub" id="gate-sub">친구에게 받은 비밀번호를 넣어주세요.</p>
+
+    <form id="gate-form" autocomplete="off">
+      <label class="sr-only" for="gate-input">비밀번호</label>
+      <input id="gate-input" type="password" inputmode="numeric"
+             placeholder="비밀번호" maxlength="20" autocomplete="off">
+      <button type="submit" id="gate-go">입장</button>
+    </form>
+
+    <p class="gate-error" id="gate-error" role="alert" aria-live="polite"></p>
+    <p class="gate-note" id="gate-note"></p>
+  </div>
+</section>
+
+<!-- ───────── 본문 ───────── -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <strong id="room-title">여행방</strong>
+        <span id="trip-range"></span>
+      </div>
+      <button type="button" class="btn-quiet" id="btn-owner" hidden>방 설정</button>
+    </div>
+
+    <nav class="tabs" id="tabs" aria-label="페이지">
+      <a href="#stay"  data-tab="stay">숙소</a>
+      <a href="#food"  data-tab="food">맛집</a>
+      <a href="#plan"  data-tab="plan">일정</a>
+      <a href="#money" data-tab="money">정산</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ───────── 숙소 ───────── -->
+    <section class="panel" id="panel-stay">
+      <div class="panel-head">
+        <h2>숙소 후보</h2>
+        <p class="muted" id="stay-count"></p>
+      </div>
+
+      <div class="layout">
+        <div class="map-col">
+          <div class="map-wrap">
+            <div id="map-stay" class="map"></div>
+            <div class="map-legend" role="group" aria-label="지도 표시">
+              <button type="button" data-filter="all" class="on">전부</button>
+              <button type="button" data-filter="lodging">숙소만</button>
+              <button type="button" data-filter="spot">관광지만</button>
+            </div>
+          </div>
+          <p class="map-hint muted">
+            파란 번호 핀이 숙소, 회색 점이 관광지예요.
+            카드를 누르면 지도가 따라가고, 같은 카드를 다시 누르면 전체 지도로 돌아옵니다.
+          </p>
+        </div>
+
+        <div class="list-col">
+          <div id="vote-note" class="note" hidden></div>
+          <ul class="cards" id="lodging-list"></ul>
+          <div class="adder-slot" id="adder-stay"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────── 맛집 ───────── -->
+    <section class="panel" id="panel-food" hidden>
+      <div class="panel-head">
+        <h2>맛집 · 카페</h2>
+        <p class="muted" id="food-count"></p>
+      </div>
+
+      <div class="layout">
+        <div class="map-col">
+          <div class="map-wrap"><div id="map-food" class="map"></div></div>
+          <p class="map-hint muted">
+            꽉 찬 핀이 식당, 속이 빈 핀이 카페예요.
+            같은 카드를 다시 누르면 전체 지도로 돌아옵니다.
+          </p>
+        </div>
+
+        <div class="list-col">
+          <div class="chips" id="food-filters"></div>
+          <ul class="cards" id="food-list"></ul>
+          <div class="adder-slot" id="adder-food"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────── 일정 (2단계) ───────── -->
+    <section class="panel" id="panel-plan" hidden>
+      <div class="panel-head"><h2>일정표</h2></div>
+      <div class="soon">
+        <strong>곧 열립니다</strong>
+        <p>숙소·맛집 투표 결과로 <strong>이동시간이 가장 짧은 순서</strong>를 짜주고,
+           그 뒤에 직접 고칠 수 있게 만들고 있어요.</p>
+        <p class="muted">지금은 숙소와 맛집을 모으고 투표하는 데 집중해주세요.</p>
+      </div>
+    </section>
+
+    <!-- ───────── 정산 (2단계) ───────── -->
+    <section class="panel" id="panel-money" hidden>
+      <div class="panel-head"><h2>경비 정산</h2></div>
+      <div class="soon">
+        <strong>곧 열립니다</strong>
+        <p>쓴 돈을 적으면 1인당 얼마인지,
+           <strong>누가 누구에게 얼마를 보내면 되는지</strong> 계산해줍니다.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p class="muted" id="room-foot"></p>
+  </footer>
+</div>
+
+<!-- ───────── 방 설정 (방장만) ───────── -->
+<dialog id="owner-dlg">
+  <form method="dialog" class="dlg-box">
+    <h2 class="card-title">방 설정</h2>
+
+    <p class="field-note">
+      이 방은 <strong id="owner-who">만든 사람</strong>이 만들었어요.
+      <strong>비밀번호 변경과 방 삭제만</strong> 만든 사람이 할 수 있고,
+      나머지는 친구들 모두 똑같이 할 수 있어요.
+    </p>
+
+    <label class="field">
+      <span class="field-label">새 비밀번호</span>
+      <input id="owner-pw" type="password" maxlength="20" placeholder="4자 이상">
+    </label>
+    <p class="field-note">
+      ⚠️ 비밀번호를 바꾸면 <strong>친구들이 모두 다시 입장</strong>해야 해요.
+      링크가 엉뚱한 곳에 퍼졌을 때 쓰는 기능입니다.
+    </p>
+    <button type="button" class="btn-primary" id="owner-save">비밀번호 바꾸기</button>
+
+    <hr class="dlg-sep">
+
+    <button type="button" class="btn-danger" id="owner-del">이 방 삭제하기</button>
+    <p class="field-note">
+      친구들이 넣은 숙소·맛집·투표가 <strong>모두 함께 사라집니다.</strong> 되돌릴 수 없어요.
+    </p>
+
+    <p class="form-error" id="owner-error" role="alert" aria-live="polite"></p>
+    <button value="close" class="btn-quiet">닫기</button>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="assets/room.js"></script>
+</body>
+</html>

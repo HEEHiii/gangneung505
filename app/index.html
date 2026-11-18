@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>친구들과 여행계획 — 같이 정하고 같이 가요</title>
+<meta name="description" content="숙소와 맛집을 친구들과 투표로 정하고, 일정과 경비까지 한 곳에서. 친구들은 가입하지 않아도 됩니다.">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="landing">
+
+<header class="hero">
+  <p class="hero-eyebrow">같이 가는 여행</p>
+  <h1 class="hero-title">친구들과 여행계획을 짜보세요</h1>
+  <p class="hero-sub">
+    숙소와 맛집을 <strong>투표로</strong> 정하고, 일정과 경비까지 한 곳에서.<br>
+    링크를 받은 친구들은 <strong>가입하지 않아도</strong> 바로 들어옵니다.
+  </p>
+</header>
+
+<main class="wrap">
+
+  <!-- ───────── 방 만들기 ───────── -->
+  <section class="card" id="make">
+    <h2 class="card-title">여행방 만들기</h2>
+
+    <form id="form" autocomplete="off" novalidate>
+
+      <label class="field">
+        <span class="field-label">여행 이름</span>
+        <input id="f-title" maxlength="30" placeholder="예: 겨울 강릉" required>
+      </label>
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">출발</span>
+          <input id="f-start" type="date" required>
+        </label>
+        <label class="field">
+          <span class="field-label">도착</span>
+          <input id="f-end" type="date" required>
+        </label>
+      </div>
+      <p class="field-note" id="nights-note"></p>
+
+      <label class="field">
+        <span class="field-label">인원</span>
+        <input id="f-people" type="number" inputmode="numeric" min="1" max="30" value="4" required>
+        <span class="field-suffix">명</span>
+      </label>
+
+      <!-- 지역 -->
+      <label class="field">
+        <span class="field-label">어디로 가요?</span>
+        <select id="f-region"></select>
+      </label>
+
+      <!-- 목록에 없는 곳은 검색으로 -->
+      <div class="field sub-field" id="custom-wrap" hidden>
+        <span class="field-label">장소 검색</span>
+        <div class="search-row">
+          <input id="f-custom" placeholder="예: 담양 죽녹원, 고성 바닷가" aria-describedby="custom-note">
+          <button type="button" id="btn-custom">찾기</button>
+        </div>
+        <p class="field-note" id="custom-note">가고 싶은 곳 이름을 넣고 찾기를 누르세요.</p>
+        <ul class="pick-list" id="custom-hits" hidden></ul>
+      </div>
+
+      <!-- 테마 -->
+      <fieldset class="field">
+        <legend class="field-label">화면 분위기</legend>
+        <div class="theme-pick" id="f-theme"></div>
+        <p class="field-note">여행 날짜에 맞춰 골라뒀어요. 바꿔도 됩니다.</p>
+      </fieldset>
+
+      <!-- 비밀번호 -->
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">비밀번호</span>
+          <input id="f-pw" type="password" inputmode="numeric" maxlength="20"
+                 placeholder="4자 이상" required>
+        </label>
+        <label class="field">
+          <span class="field-label">한 번 더</span>
+          <input id="f-pw2" type="password" inputmode="numeric" maxlength="20" required>
+        </label>
+      </div>
+      <p class="field-note">
+        친구들이 들어올 때 쓰는 비밀번호예요.
+        <strong>링크와 따로</strong> 알려주세요.
+      </p>
+
+      <p class="form-error" id="form-error" role="alert" aria-live="polite"></p>
+
+      <button type="submit" class="btn-primary" id="btn-make">방 만들기</button>
+      <p class="field-note center" id="login-note"></p>
+    </form>
+  </section>
+
+  <!-- ───────── 만든 뒤 ───────── -->
+  <section class="card done" id="done" hidden>
+    <h2 class="card-title">방이 만들어졌어요</h2>
+
+    <p class="done-sub" id="done-title"></p>
+
+    <label class="field">
+      <span class="field-label">친구들에게 보낼 링크</span>
+      <div class="search-row">
+        <input id="share-url" readonly>
+        <button type="button" id="btn-copy">복사</button>
+      </div>
+    </label>
+
+    <div class="note warn">
+      <strong>비밀번호는 링크와 따로 알려주세요.</strong>
+      같은 메시지에 함께 보내면 링크를 받은 누구나 들어올 수 있어요.
+    </div>
+
+    <a class="btn-primary" id="btn-enter" href="#">방으로 들어가기</a>
+    <button type="button" class="btn-quiet" id="btn-again">다른 방 또 만들기</button>
+  </section>
+
+  <!-- ───────── 내 방 목록 ───────── -->
+  <section class="card" id="mine" hidden>
+    <h2 class="card-title">내 여행방</h2>
+    <ul class="room-list" id="room-list"></ul>
+    <p class="field-note" id="mine-note"></p>
+  </section>
+
+  <!-- ───────── 어떻게 쓰는지 ───────── -->
+  <section class="card how">
+    <h2 class="card-title">어떻게 쓰나요?</h2>
+    <ol class="how-list">
+      <li><strong>방을 만들고</strong> 링크를 카톡으로 보냅니다.</li>
+      <li>친구들이 링크를 열고 <strong>비밀번호</strong>를 넣으면 들어옵니다. 가입은 없습니다.</li>
+      <li>숙소와 맛집을 <strong>검색하거나 링크로</strong> 추가하고 <strong>투표</strong>합니다.</li>
+      <li>투표 결과로 <strong>일정</strong>을 짜고, 쓴 돈은 <strong>자동으로 정산</strong>합니다.</li>
+    </ol>
+    <p class="field-note" id="stage-note">
+      지금은 숙소·맛집·투표까지 쓸 수 있어요. 일정과 정산은 곧 열립니다.
+    </p>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <p id="mode-note"></p>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="assets/landing.js"></script>
+</body>
+</html>
