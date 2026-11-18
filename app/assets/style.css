@@ -1,0 +1,624 @@
+/* ============================================================
+   계절 테마 4종 — 봄 · 여름 · 가을 · 겨울
+
+   색을 전부 변수로 뽑아두었습니다. 테마를 바꾸는 것은
+   <html data-theme="winter"> 한 줄이고, 그러면 값만 갈립니다.
+
+   ★ 지도 위의 핀 색은 테마를 따르지 않습니다.
+     카카오 지도는 다크 모드가 없어서 늘 밝습니다. 핀의 흰 테두리를
+     다크 테마에서 어둡게 바꾸면 밝은 지도 위에서 핀이 사라집니다.
+     그래서 --pin-ring / --pin-fill 은 고정입니다.
+
+   ★ 다크 모드는 덤으로 따라옵니다.
+     계절 네 개 × (밝게/어둡게) 여덟 벌이고, 어두운 쪽은
+     prefers-color-scheme 를 따릅니다.
+   ============================================================ */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+
+:root{
+  /* 테마와 무관한 값 */
+  --r:12px;
+  --gutter:16px;
+  --maxw:1180px;
+
+  /* 지도 위 — 지도가 늘 밝으므로 고정입니다 */
+  --pin-ring:#ffffff;
+  --pin-fill:#ffffff;
+  --pin-grey:#8a8f96;
+
+  --shadow-sm:var(--shadow-sm);
+  --shadow-md:var(--shadow-md);
+  --shadow-lg:var(--shadow-lg);
+  --shadow-xl:var(--shadow-xl);
+}
+
+/* ───────── 여름 (기본) ───────── */
+:root,
+:root[data-theme="summer"]{
+  color-scheme:light;
+  --bg:#ffffff; --surface:#f7fbfd; --surface-2:#eef6fa;
+  --line:#e0edf3; --line-strong:#c9dde7;
+  --text:#16202a; --muted:#64757f; --faint:#a9b6bf;
+  --accent:#0d6f93; --accent-soft:#e4f3f9; --on-dark:#ffffff;
+  --danger:#b3382a; --ok:#1a7f4b;
+}
+
+/* ───────── 봄 ───────── */
+:root[data-theme="spring"]{
+  color-scheme:light;
+  --bg:#fffdfd; --surface:#fff7f8; --surface-2:#fdeef1;
+  --line:#f3e3e6; --line-strong:#e6ccd2;
+  --text:#2a1f22; --muted:#80686f; --faint:#c3aeb4;
+  --accent:#c14b68; --accent-soft:#fdeef2; --on-dark:#ffffff;
+  --danger:#b3382a; --ok:#1a7f4b;
+}
+
+/* ───────── 가을 ───────── */
+:root[data-theme="autumn"]{
+  color-scheme:light;
+  --bg:#fffdfa; --surface:#fdf8f1; --surface-2:#faf0e3;
+  --line:#f0e3d2; --line-strong:#ddc9ae;
+  --text:#2a2018; --muted:#7d6e5c; --faint:#c2b29c;
+  --accent:#a8521a; --accent-soft:#fcefe2; --on-dark:#ffffff;
+  --danger:#b3382a; --ok:#1a7f4b;
+}
+
+/* ───────── 겨울 ───────── */
+:root[data-theme="winter"]{
+  color-scheme:light;
+  /* 배경을 차가운 회백색으로 두고 카드를 흰색으로 띄웁니다.
+     여름도 흰 배경이라, 둘 다 순백이면 테마를 바꿔도 달라 보이지
+     않습니다 (테스트가 "배경색이 겹친다"로 잡아냈습니다). */
+  --bg:#f6f8fa; --surface:#ffffff; --surface-2:#eaeff4;
+  --line:#dde5ec; --line-strong:#c4d0da;
+  --text:#1a1f24; --muted:#5e6a75; --faint:#a4aeb8;
+  --accent:#2f5e92; --accent-soft:#eaf1f8; --on-dark:#ffffff;
+  --danger:#b3382a; --ok:#1a7f4b;
+}
+
+/* ───────── 어두울 때 ───────── */
+@media (prefers-color-scheme: dark){
+  :root,
+  :root[data-theme="summer"]{
+    color-scheme:dark;
+    --bg:#0f1720; --surface:#16202a; --surface-2:#1d2935;
+    --line:#27353f; --line-strong:#3a4a57;
+    --text:#e6f0f6; --muted:#9db2bf; --faint:#5c6a75;
+    --accent:#54c4ea; --accent-soft:#16323f; --on-dark:#0f1720;
+    --danger:#ff8a7a; --ok:#5ed39a;
+  }
+  :root[data-theme="spring"]{
+    color-scheme:dark;
+    --bg:#1a1416; --surface:#221a1d; --surface-2:#2b2125;
+    --line:#352a2e; --line-strong:#4a3a3f;
+    --text:#f3e9ec; --muted:#b9a1a8; --faint:#6e5a60;
+    --accent:#f49ab0; --accent-soft:#3a262c; --on-dark:#1a1416;
+    --danger:#ff8a7a; --ok:#5ed39a;
+  }
+  :root[data-theme="autumn"]{
+    color-scheme:dark;
+    --bg:#1a1510; --surface:#221c15; --surface-2:#2b241b;
+    --line:#352c22; --line-strong:#4a3e30;
+    --text:#f4ece2; --muted:#bdac98; --faint:#71634f;
+    --accent:#f39a55; --accent-soft:#3a2a1b; --on-dark:#1a1510;
+    --danger:#ff8a7a; --ok:#5ed39a;
+  }
+  :root[data-theme="winter"]{
+    color-scheme:dark;
+    --bg:#11161b; --surface:#182027; --surface-2:#1f2932;
+    --line:#2a353e; --line-strong:#3d4b56;
+    --text:#e9eff4; --muted:#9dacb8; --faint:#5b6873;
+    --accent:#86b6e6; --accent-soft:#1b2c3c; --on-dark:#11161b;
+    --danger:#ff8a7a; --ok:#5ed39a;
+  }
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,
+              "Segoe UI","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+h1,h2,h3{line-height:1.3;margin:0;letter-spacing:-0.02em}
+p{margin:0}
+ul{list-style:none;margin:0;padding:0}
+a{color:inherit}
+button,input{font:inherit;color:inherit}
+.muted{color:var(--muted);font-size:13px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+
+/* ───────── 게이트 ───────── */
+#gate{
+  position:fixed;inset:0;z-index:50;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg);padding:var(--gutter);
+}
+#gate[hidden]{display:none}
+.gate-box{width:100%;max-width:340px;text-align:center}
+.gate-eyebrow{
+  font-size:11px;letter-spacing:0.28em;color:var(--muted);
+  margin-bottom:14px;font-weight:600;
+}
+.gate-title{font-size:34px;font-weight:700;margin-bottom:8px}
+.gate-sub{color:var(--muted);font-size:14px;margin-bottom:36px}
+#gate-form{display:flex;flex-direction:column;gap:10px}
+#gate-input{
+  width:100%;height:50px;padding:0 16px;text-align:center;
+  border:1px solid var(--line-strong);border-radius:var(--r);
+  background:var(--bg);letter-spacing:0.3em;
+  transition:border-color .15s;
+}
+#gate-input::placeholder{letter-spacing:0;color:var(--faint)}
+#gate-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+#gate-form button{
+  height:50px;border:0;border-radius:var(--r);
+  background:var(--text);color:var(--on-dark);font-weight:600;cursor:pointer;
+  transition:opacity .15s;
+}
+#gate-form button:hover{opacity:.85}
+.gate-error{min-height:20px;margin-top:14px;font-size:13px;color:var(--danger)}
+.shake{animation:shake .3s}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-6px)}
+  75%{transform:translateX(6px)}
+}
+
+/* ───────── 상단바 ───────── */
+.topbar{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+.topbar-inner{max-width:var(--maxw);margin:0 auto;padding:14px var(--gutter) 10px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand strong{font-size:17px;letter-spacing:-0.02em}
+.brand span{font-size:12px;color:var(--muted)}
+.tabs{
+  max-width:var(--maxw);margin:0 auto;padding:0 var(--gutter);
+  display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tabs a{
+  flex:0 0 auto;padding:10px 14px;font-size:14px;font-weight:500;
+  color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;
+  transition:color .15s,border-color .15s;white-space:nowrap;
+}
+.tabs a:hover{color:var(--text)}
+.tabs a.on{color:var(--text);font-weight:600;border-bottom-color:var(--text)}
+
+/* ───────── 레이아웃 ───────── */
+main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
+.panel[hidden]{display:none}
+.panel-head{margin-bottom:18px}
+.panel-head h2{font-size:21px;margin-bottom:4px}
+.layout{display:flex;flex-direction:column;gap:18px}
+
+/* ───────── 지도 ───────── */
+.map-wrap{position:relative}
+.map{
+  height:300px;border:1px solid var(--line);border-radius:var(--r);
+  background:var(--surface-2);
+}
+.map-legend{
+  position:absolute;top:10px;right:10px;z-index:400;
+  display:flex;gap:0;background:var(--bg);
+  border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;
+  box-shadow:var(--shadow-sm);
+}
+.map-legend button{
+  border:0;background:transparent;padding:7px 11px;font-size:12px;
+  color:var(--muted);cursor:pointer;
+}
+.map-legend button + button{border-left:1px solid var(--line)}
+.map-legend button.on{background:var(--text);color:var(--on-dark);font-weight:600}
+.map-hint{margin-top:8px}
+
+/* 핀 */
+.pin-lodging{
+  width:28px;height:28px;border-radius:50% 50% 50% 2px;
+  transform:rotate(45deg);
+  background:var(--accent);border:2px solid var(--pin-ring);
+  box-shadow:var(--shadow-lg);
+  display:flex;align-items:center;justify-content:center;
+}
+.pin-lodging span{transform:rotate(-45deg);color:var(--pin-ring);font-size:12px;font-weight:700}
+.pin-lodging.sel{background:var(--text);transform:rotate(45deg) scale(1.18)}
+.pin-spot{
+  width:11px;height:11px;border-radius:50%;
+  background:var(--pin-grey);border:2px solid var(--pin-ring);
+  box-shadow:var(--shadow-md);
+}
+/* 맛집 탭 핀 — 식당은 채움, 카페는 테두리만 (색 말고 모양으로도 구분) */
+.pin-food{
+  width:20px;height:20px;border-radius:50% 50% 50% 2px;
+  transform:rotate(45deg);
+  background:var(--accent);border:2px solid var(--pin-ring);
+  box-shadow:var(--shadow-lg);
+}
+.pin-food.cafe{background:var(--pin-fill);border-color:var(--accent);box-shadow:var(--shadow-md)}
+.leaflet-container{font-family:inherit;border-radius:var(--r)}
+
+/* ───────── 카드 ───────── */
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{
+  border:1px solid var(--line);border-radius:var(--r);
+  padding:14px 16px;background:var(--bg);
+  cursor:pointer;transition:border-color .15s,background .15s;
+}
+.card:hover{border-color:var(--line-strong)}
+.card.sel{border-color:var(--accent);background:var(--accent-soft)}
+.card-top{display:flex;align-items:flex-start;gap:10px}
+.card-no{
+  flex:0 0 22px;height:22px;border-radius:50%;
+  background:var(--accent);color:var(--on-dark);
+  font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;margin-top:2px;
+}
+.card-no.off{background:var(--line-strong)}
+.card-body{flex:1;min-width:0}
+.card-name{font-size:15px;font-weight:600;letter-spacing:-0.01em}
+.card-meta{font-size:13px;color:var(--muted);margin-top:2px}
+.card-note{font-size:13px;color:var(--muted);margin-top:6px}
+.badge{
+  display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;
+  background:var(--surface-2);color:var(--muted);margin-left:6px;vertical-align:1px;
+}
+.dists{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.dist{
+  font-size:11px;padding:2px 8px;border-radius:99px;
+  background:var(--surface);border:1px solid var(--line);color:var(--muted);
+}
+.card-actions{display:flex;gap:8px;margin-top:12px;align-items:center}
+.btn-link,.btn-vote{
+  border:1px solid var(--line-strong);background:var(--bg);
+  border-radius:8px;padding:7px 12px;font-size:13px;
+  cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;
+  transition:border-color .15s,background .15s;
+}
+.btn-link:hover,.btn-vote:hover{border-color:var(--text)}
+.btn-vote.voted{background:var(--accent);border-color:var(--accent);color:var(--on-dark);font-weight:600}
+.btn-vote:disabled{opacity:.45;cursor:default}
+.btn-vote:disabled:hover{border-color:var(--line-strong)}
+.vote-count{font-size:13px;color:var(--muted);margin-left:auto}
+.vote-count strong{color:var(--text);font-size:15px}
+
+/* ───────── 안내 박스 ───────── */
+.note{
+  border:1px solid var(--line);border-left:3px solid var(--accent);
+  background:var(--surface);border-radius:8px;
+  padding:11px 14px;font-size:13px;color:var(--muted);margin-bottom:12px;
+}
+.note[hidden]{display:none}
+.empty{
+  border:1px dashed var(--line-strong);border-radius:var(--r);
+  padding:34px 20px;text-align:center;color:var(--muted);font-size:14px;
+}
+
+/* ───────── 일정 ───────── */
+.day{margin-bottom:26px}
+.day-head{
+  display:flex;align-items:baseline;gap:9px;
+  padding-bottom:9px;border-bottom:1px solid var(--line);margin-bottom:4px;
+}
+.day-head h3{font-size:16px}
+.day-head span{font-size:13px;color:var(--muted)}
+.slot{display:flex;gap:14px;padding:11px 0;border-bottom:1px solid var(--surface-2)}
+.slot-time{
+  flex:0 0 52px;font-size:13px;color:var(--muted);
+  font-variant-numeric:tabular-nums;padding-top:1px;
+}
+.slot-body{flex:1;min-width:0}
+.slot-title{font-size:14px;font-weight:500}
+.slot-note{font-size:13px;color:var(--muted);margin-top:1px}
+.slot.fixed .slot-title{font-weight:600}
+
+/* ───────── 경비 ───────── */
+.expense-form{
+  border:1px solid var(--line);border-radius:var(--r);
+  padding:14px;margin-bottom:18px;background:var(--surface);
+}
+.expense-form .row{display:flex;gap:10px;margin-bottom:10px}
+.expense-form .row:last-child{margin-bottom:0}
+.expense-form label{flex:1;display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.expense-form input{
+  height:40px;padding:0 11px;border:1px solid var(--line-strong);
+  border-radius:8px;background:var(--bg);font-size:14px;width:100%;
+}
+.expense-form input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.expense-form button{
+  flex:0 0 84px;height:40px;align-self:flex-end;border:0;border-radius:8px;
+  background:var(--text);color:var(--on-dark);font-weight:600;cursor:pointer;
+}
+.expense-form button:hover{opacity:.85}
+.summary{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.stat{
+  flex:1;min-width:130px;border:1px solid var(--line);border-radius:var(--r);
+  padding:13px 15px;
+}
+.stat-k{font-size:12px;color:var(--muted)}
+.stat-v{font-size:21px;font-weight:700;letter-spacing:-0.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+.expense-list{border-top:1px solid var(--line);margin-bottom:20px}
+.expense-list li{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 2px;border-bottom:1px solid var(--line);font-size:14px;
+}
+.ex-item{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ex-payer{font-size:12px;color:var(--muted);flex:0 0 auto}
+.ex-amount{font-variant-numeric:tabular-nums;font-weight:600;flex:0 0 auto}
+.ex-del{
+  border:0;background:transparent;color:var(--muted);cursor:pointer;
+  font-size:17px;line-height:1;padding:2px 4px;flex:0 0 auto;
+}
+.ex-del:hover{color:var(--danger)}
+.settlement{
+  border:1px solid var(--line);border-radius:var(--r);padding:15px;background:var(--surface);
+}
+.settlement[hidden]{display:none}
+/* 경비·일정은 글줄이 길어지면 읽기 나빠서 폭을 제한 */
+#panel-money > *, #panel-plan > *{max-width:720px}
+.settlement h3{font-size:14px;margin-bottom:10px}
+.settlement li{font-size:14px;padding:5px 0;color:var(--text)}
+.settlement li em{font-style:normal;font-weight:600}
+
+/* ───────── 칩 ───────── */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chip{
+  border:1px solid var(--line-strong);background:var(--bg);
+  border-radius:99px;padding:5px 13px;font-size:13px;color:var(--muted);cursor:pointer;
+}
+.chip.on{background:var(--text);border-color:var(--text);color:var(--on-dark);font-weight:600}
+
+/* ───────── 추가 폼 (숙소 · 맛집) ───────── */
+.adder{
+  margin-top:12px;border:1px dashed var(--line-strong);
+  border-radius:var(--r);background:var(--surface);
+}
+.adder summary{
+  cursor:pointer;padding:12px 16px;font-size:14px;font-weight:600;
+  color:var(--muted);list-style:none;
+}
+.adder summary::-webkit-details-marker{display:none}
+.adder summary:hover{color:var(--text)}
+.adder[open]{background:var(--bg);border-style:solid}
+.adder[open] summary{color:var(--text);border-bottom:1px solid var(--line)}
+.adder-form{padding:14px 16px 16px;display:flex;flex-direction:column;gap:11px}
+/* label 을 block 으로 둬야 "위치 (선택)" 이 한 줄에 붙습니다 */
+.adder-form label{display:block;font-size:12px;color:var(--muted)}
+.adder-form label > input,
+.adder-form label > select,
+.adder-form label > .pickrow{margin-top:5px}
+.adder-form .opt{color:var(--faint);font-weight:400}
+.adder-form input,.adder-form select{
+  height:40px;padding:0 11px;border:1px solid var(--line-strong);
+  border-radius:8px;background:var(--bg);font-size:14px;width:100%;
+}
+.adder-form input:focus,.adder-form select:focus{
+  outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);
+}
+.pickrow{display:flex;gap:7px}
+.pickrow input{flex:1;min-width:0}
+.btn-pick{
+  flex:0 0 auto;height:40px;padding:0 12px;white-space:nowrap;
+  border:1px solid var(--line-strong);border-radius:8px;background:var(--bg);
+  font-size:13px;color:var(--muted);cursor:pointer;
+}
+.btn-pick:hover{border-color:var(--text);color:var(--text)}
+.btn-pick.on{background:var(--accent);border-color:var(--accent);color:var(--on-dark);font-weight:600}
+.adder-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:3px}
+.adder-actions button{
+  flex:0 0 auto;height:40px;padding:0 20px;border:0;border-radius:8px;
+  background:var(--text);color:var(--on-dark);font-weight:600;cursor:pointer;
+}
+.adder-actions button:hover{opacity:.85}
+.adder-actions button:disabled{opacity:.5;cursor:default}
+.adder-actions .muted{flex:1;min-width:150px}
+
+.btn-del{
+  border:1px solid var(--line-strong);background:var(--bg);border-radius:8px;
+  padding:7px 11px;font-size:13px;color:var(--muted);cursor:pointer;
+}
+.btn-del:hover{border-color:var(--danger);color:var(--danger)}
+.badge.added{background:var(--accent-soft);color:var(--accent)}
+
+/* 지도에서 위치 찍는 중 */
+.leaflet-container.picking{cursor:crosshair}
+.leaflet-container.picking .leaflet-marker-icon{cursor:crosshair}
+.pin-pick{
+  width:26px;height:26px;border-radius:50% 50% 50% 2px;
+  transform:rotate(45deg);
+  background:var(--pin-fill);border:3px solid var(--danger);
+  box-shadow:var(--shadow-xl);
+}
+
+/* ───────── 일정 직접 수정 ───────── */
+.plan-bar{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:14px;min-height:30px;
+}
+.save-status{flex:1;font-size:12px;color:var(--muted)}
+.save-status.bad{color:var(--danger)}
+.btn-quiet{
+  border:1px solid var(--line);background:var(--bg);border-radius:8px;
+  padding:6px 11px;font-size:12px;color:var(--muted);cursor:pointer;
+}
+.btn-quiet:hover{border-color:var(--line-strong);color:var(--text)}
+
+.slot.edit{align-items:flex-start;gap:9px}
+.slot-time-in,.slot-title-in,.slot-note-in{
+  border:1px solid transparent;border-radius:7px;background:transparent;
+  padding:6px 8px;width:100%;transition:border-color .12s,background .12s;
+}
+.slot-time-in{
+  flex:0 0 66px;width:66px;font-size:13px;color:var(--muted);
+  font-variant-numeric:tabular-nums;text-align:center;
+}
+.slot-title-in{font-size:14px;font-weight:500}
+.slot-note-in{font-size:13px;color:var(--muted);margin-top:1px}
+.slot-time-in::placeholder,.slot-title-in::placeholder,.slot-note-in::placeholder{color:var(--faint)}
+.slot-time-in:hover,.slot-title-in:hover,.slot-note-in:hover{background:var(--surface)}
+.slot-time-in:focus,.slot-title-in:focus,.slot-note-in:focus{
+  outline:none;background:var(--bg);border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft);
+}
+.slot-del{
+  flex:0 0 auto;border:0;background:transparent;color:var(--faint);cursor:pointer;
+  font-size:18px;line-height:1;padding:6px 6px;border-radius:6px;
+}
+.slot-del:hover{color:var(--danger);background:var(--surface)}
+.slot-add{
+  margin-top:10px;border:1px dashed var(--line-strong);background:transparent;
+  border-radius:8px;padding:9px 14px;font-size:13px;color:var(--muted);
+  cursor:pointer;width:100%;text-align:center;
+}
+.slot-add:hover{border-color:var(--text);color:var(--text)}
+
+/* ───────── 링크 자동 조회 상태 ───────── */
+.resolve-status{
+  font-size:12px;color:var(--muted);margin-top:-5px;
+  padding-left:2px;line-height:1.45;
+}
+.resolve-status.busy{color:var(--accent)}
+.resolve-status.ok{color:var(--ok)}
+.resolve-status.bad{color:var(--danger)}
+
+/* ───────── 경로 짜기 ───────── */
+.route-box{
+  border:1px solid var(--line);border-radius:var(--r);
+  padding:16px;margin-bottom:22px;background:var(--surface);
+}
+.route-box h3{font-size:15px;margin-bottom:5px}
+.route-preview{margin:13px 0}
+.route-pick{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  padding:7px 0;font-size:14px;
+}
+.route-k{
+  flex:0 0 52px;font-size:11px;color:var(--muted);
+  background:var(--surface-2);border-radius:99px;
+  padding:2px 0;text-align:center;
+}
+.route-chip{
+  font-size:12px;padding:3px 9px;border-radius:99px;
+  background:var(--bg);border:1px solid var(--line);
+}
+.route-chip b{color:var(--accent);margin-left:2px}
+.route-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.route-actions button{
+  flex:0 0 auto;height:40px;padding:0 18px;border:0;border-radius:8px;
+  background:var(--text);color:var(--on-dark);font-weight:600;cursor:pointer;
+}
+.route-actions button:hover{opacity:.85}
+.route-actions button:disabled{opacity:.5;cursor:default}
+.route-actions .muted{flex:1;min-width:160px}
+.muted.bad{color:var(--danger)}
+
+/* ───────── 토스트 ───────── */
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translate(-50%,16px);
+  background:var(--text);color:var(--on-dark);font-size:13px;
+  padding:10px 18px;border-radius:99px;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;
+  max-width:calc(100vw - 32px);text-align:center;
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+.foot{border-top:1px solid var(--line);padding:18px var(--gutter);text-align:center}
+.foot p{font-size:11px;color:var(--muted)}
+
+/* ───────── 데스크톱 ───────── */
+@media (min-width:860px){
+  .layout{flex-direction:row;align-items:flex-start;gap:26px}
+  .map-col{flex:1 1 52%;position:sticky;top:104px}
+  .list-col{flex:1 1 48%;min-width:0}
+  .map{height:min(560px,calc(100vh - 170px))}
+  .gate-title{font-size:38px}
+  .panel-head h2{font-size:23px}
+}
+@media (max-width:420px){
+  .expense-form .row{flex-direction:column;gap:10px}
+  .expense-form button{flex:none;width:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+
+
+/* ============================================================
+   카카오 지도로 바꾸면서 새로 필요해진 것들
+   ============================================================ */
+
+/* 핀을 감싸는 틀 — CustomOverlay 가 이 요소를 그대로 얹습니다 */
+.pin-wrap{position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer}
+
+/* 핀 옆 이름표.
+   Leaflet 의 bindTooltip 에 해당하는 것이 카카오에는 없어서 직접 만듭니다. */
+.pin-label{
+  margin-top:2px;padding:1px 6px;border-radius:999px;
+  background:var(--bg);color:var(--text);
+  border:1px solid var(--line-strong);
+  font-size:11px;line-height:1.5;font-weight:600;white-space:nowrap;
+  box-shadow:var(--shadow-sm);
+  max-width:120px;overflow:hidden;text-overflow:ellipsis;
+}
+.pin-label.sm{font-size:10px;padding:0 5px;font-weight:500;color:var(--muted)}
+
+/* 관광지 핀을 맛집 탭에서는 조금 크게 */
+.pin-spot.big{width:14px;height:14px;border:2px solid var(--pin-ring);box-shadow:var(--shadow-md)}
+
+/* 핀을 누르면 뜨는 말풍선.
+   카카오 InfoWindow 는 Marker 를 요구해서 CustomOverlay 로 직접 만듭니다. */
+.map-bubble{pointer-events:auto}
+.map-bubble-in{
+  position:relative;padding:8px 11px;border-radius:10px;
+  background:var(--bg);color:var(--text);
+  border:1px solid var(--line-strong);
+  box-shadow:var(--shadow-lg);
+  font-size:13px;line-height:1.5;white-space:nowrap;
+  max-width:240px;
+}
+.map-bubble-in .sub{color:var(--muted);font-size:12px}
+.map-bubble-in::after{
+  content:"";position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--line-strong);
+}
+
+/* 지도를 못 띄울 때 — 키가 없거나 도메인 등록이 안 된 경우.
+   페이지 전체가 죽는 대신 여기만 안내판으로 바뀝니다. */
+.map.map-off{
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface-2);border:1px dashed var(--line-strong);
+}
+.map-off-note{
+  display:flex;flex-direction:column;gap:4px;align-items:center;
+  text-align:center;padding:16px;font-size:13px;line-height:1.6;
+}
+.map-off-note strong{font-size:14px}
+.map-off-note .muted{color:var(--muted);font-size:12px}
+
+
+/* ============================================================
+   테마 고르기 (방 만들기 화면)
+   ============================================================ */
+.theme-pick{display:flex;gap:8px;flex-wrap:wrap}
+.theme-opt{
+  flex:1 1 72px;display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:10px 8px;border:1px solid var(--line);border-radius:var(--r);
+  background:var(--surface);cursor:pointer;font-size:13px;
+}
+.theme-opt input{position:absolute;opacity:0;width:0;height:0}
+.theme-opt .swatch{
+  width:100%;height:22px;border-radius:6px;border:1px solid var(--line-strong);
+}
+.theme-opt:has(input:checked){
+  border-color:var(--accent);background:var(--accent-soft);font-weight:600;
+}
+.theme-opt:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+
+/* 각 계절의 느낌을 작은 색 띠로 보여줍니다 */
+.swatch-spring{background:linear-gradient(135deg,#fdeef1,#c14b68)}
+.swatch-summer{background:linear-gradient(135deg,#e4f3f9,#0d6f93)}
+.swatch-autumn{background:linear-gradient(135deg,#fcefe2,#a8521a)}
+.swatch-winter{background:linear-gradient(135deg,#eaf1f8,#2f5e92)}
