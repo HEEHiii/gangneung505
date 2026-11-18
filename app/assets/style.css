@@ -114,6 +114,13 @@
 }
 
 *,*::before,*::after{box-sizing:border-box}
+
+/* ★ hidden 속성이 항상 이기게 합니다.
+   [hidden] 의 display:none 은 브라우저 기본 규칙이라, .field{display:block}
+   같은 우리 규칙에 밀립니다. 그러면 숨겨둔 영역이 그대로 보입니다
+   (실제로 "장소 검색" 상자가 늘 떠 있었습니다).
+   탭 패널도 hidden 으로 여닫으므로 여기서 한 번에 막아둡니다. */
+[hidden]{display:none !important}
 html,body{margin:0;padding:0}
 body{
   background:var(--bg);
@@ -622,3 +629,128 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 .swatch-summer{background:linear-gradient(135deg,#e4f3f9,#0d6f93)}
 .swatch-autumn{background:linear-gradient(135deg,#fcefe2,#a8521a)}
 .swatch-winter{background:linear-gradient(135deg,#eaf1f8,#2f5e92)}
+
+
+/* ============================================================
+   첫 화면 (방 만들기)
+   ============================================================ */
+.landing{background:var(--bg)}
+
+.hero{
+  padding:40px var(--gutter) 28px;text-align:center;
+  background:linear-gradient(180deg,var(--accent-soft),var(--bg));
+  border-bottom:1px solid var(--line);
+}
+.hero-eyebrow{
+  margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:.14em;
+  color:var(--accent);text-transform:uppercase;
+}
+.hero-title{margin:0 0 10px;font-size:26px;line-height:1.3;letter-spacing:-.02em}
+.hero-sub{margin:0;color:var(--muted);font-size:14px;line-height:1.7}
+.hero-sub strong{color:var(--text)}
+
+.wrap{max-width:560px;margin:0 auto;padding:20px var(--gutter) 40px;display:grid;gap:16px}
+
+.card{
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r);padding:18px;
+}
+.card-title{margin:0 0 14px;font-size:17px;letter-spacing:-.01em}
+
+/* ───────── 입력 ───────── */
+.field{display:block;margin:0 0 6px;position:relative;border:0;padding:0}
+.field-label{display:block;margin-bottom:6px;font-size:13px;font-weight:600}
+.field input,.field select{
+  width:100%;padding:11px 12px;font:inherit;font-size:15px;
+  color:var(--text);background:var(--bg);
+  border:1px solid var(--line-strong);border-radius:10px;
+}
+.field input:focus,.field select:focus{
+  outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent);
+}
+.field input[readonly]{background:var(--surface-2);color:var(--muted)}
+.field-suffix{
+  position:absolute;right:12px;bottom:11px;color:var(--muted);font-size:13px;
+  pointer-events:none;
+}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field-row .field{margin-bottom:6px}
+.theme-pick{margin-bottom:8px}
+
+.field-note{margin:0 0 14px;color:var(--muted);font-size:12px;line-height:1.6}
+.field-note.center{text-align:center}
+.field-note.bad,.form-error{color:var(--danger)}
+.field-note strong{color:var(--text)}
+
+.sub-field{
+  padding:12px;background:var(--surface-2);
+  border:1px solid var(--line);border-radius:10px;
+}
+
+.search-row{display:flex;gap:8px}
+.search-row input{flex:1 1 auto;min-width:0}
+.search-row button{
+  flex:0 0 auto;padding:0 16px;font:inherit;font-size:14px;font-weight:600;
+  color:var(--on-dark);background:var(--text);
+  border:0;border-radius:10px;cursor:pointer;
+}
+
+.pick-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.pick-list button{
+  width:100%;display:flex;flex-direction:column;gap:2px;text-align:left;
+  padding:9px 11px;font:inherit;cursor:pointer;
+  background:var(--bg);border:1px solid var(--line-strong);border-radius:9px;
+}
+.pick-list button:hover,.pick-list button:focus-visible{
+  border-color:var(--accent);background:var(--accent-soft);
+}
+.pick-list strong{font-size:14px}
+.pick-list span{font-size:12px;color:var(--muted)}
+
+.form-error{margin:0 0 12px;font-size:13px;font-weight:600;min-height:1px}
+
+/* ───────── 버튼 ───────── */
+.btn-primary{
+  display:block;width:100%;padding:13px;font:inherit;font-size:15px;font-weight:700;
+  text-align:center;text-decoration:none;
+  color:var(--on-dark);background:var(--accent);
+  border:0;border-radius:10px;cursor:pointer;
+}
+.btn-primary:disabled{opacity:.6;cursor:default}
+.btn-primary:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+
+/* ───────── 만든 뒤 ───────── */
+.done-sub{margin:0 0 14px;color:var(--muted);font-size:14px}
+.note.warn{
+  margin:0 0 14px;padding:11px 12px;font-size:13px;line-height:1.6;
+  background:var(--accent-soft);border:1px solid var(--line-strong);border-radius:10px;
+}
+.done .btn-quiet{width:100%;margin-top:10px;text-align:center}
+
+/* ───────── 내 방 목록 ───────── */
+.room-list{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:8px}
+.room-list a{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;
+  padding:11px 13px;text-decoration:none;color:inherit;
+  background:var(--bg);border:1px solid var(--line-strong);border-radius:10px;
+}
+.room-list a:hover,.room-list a:focus-visible{border-color:var(--accent);background:var(--accent-soft)}
+.room-list strong{font-size:14px}
+.room-list span{font-size:12px;color:var(--muted)}
+.room-list .tag{
+  margin-left:auto;padding:1px 8px;border-radius:999px;
+  background:var(--surface-2);border:1px solid var(--line);
+}
+
+/* ───────── 설명 ───────── */
+.how-list{margin:0 0 10px;padding-left:20px;display:grid;gap:7px;font-size:14px;line-height:1.6}
+.how-list strong{font-weight:700}
+
+.landing .foot{padding:0 var(--gutter) 28px;text-align:center}
+.landing .foot p{margin:0;color:var(--muted);font-size:12px}
+
+@media (min-width:600px){
+  .hero{padding-top:56px}
+  .hero-title{font-size:32px}
+  .wrap{padding-top:28px}
+}
