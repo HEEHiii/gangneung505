@@ -15,6 +15,59 @@ var SHEET_EXPENSES = 'expenses';
 var SHEET_ITEMS    = 'items';   // 친구들이 추가한 숙소 · 맛집
 var SHEET_DOCS     = 'docs';    // 일정표처럼 통째로 저장되는 것
 
+/* ============================================================
+   쓰기 보호 — 지우기·덮어쓰기에만 요구하는 공유 문자열
+
+   이 주소는 페이지 소스에 들어가므로 완전히 숨길 수가 없습니다.
+   그래서 "작정한 사람"을 막는 장치가 아니고, 주소만 긁어가는
+   봇과 장난을 막는 장치입니다. 읽기와 투표는 그대로 열어둡니다.
+   (친구들이 쓰던 흐름이 깨지지 않게)
+
+   ★ assets/store.js 의 WRITE_KEY 와 같은 값이어야 합니다.
+   ============================================================ */
+var WRITE_KEY = 'gn505-wr-7Qk2mXb9Rt4Z';
+
+function hasWriteKey_(body) {
+  return String((body && body.wk) || '') === WRITE_KEY;
+}
+
+/* ============================================================
+   resolve 허용 호스트
+
+   이게 없으면 /exec?type=resolve&url=... 이 "아무 주소나 대신
+   접속해주는 공개 프록시"가 됩니다. 남이 자기 트래픽을 이 구글
+   계정으로 돌릴 수 있고, UrlFetchApp 일일 할당량이 소진되면
+   링크 자동인식이 먹통이 됩니다.
+   ============================================================ */
+var ALLOW_HOSTS = [
+  'naver.me',
+  'map.naver.com', 'm.map.naver.com',
+  'place.map.naver.com', 'm.place.naver.com', 'place.naver.com',
+  'booking.naver.com', 'm.booking.naver.com',
+  'airbnb.co.kr', 'www.airbnb.co.kr',
+  'airbnb.com', 'www.airbnb.com',
+  'abnb.me'
+];
+
+function hostOf_(url) {
+  var m = String(url).match(/^https?:\/\/([^\/?#]+)/i);
+  if (!m) return '';
+  return m[1].split('@').pop().split(':')[0].toLowerCase();
+}
+
+function allowedHost_(url) {
+  var h = hostOf_(url);
+  if (!h) return false;
+  // IP 리터럴과 내부 이름은 거부 — 사설망 접근(SSRF) 차단
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false;
+  if (h === 'localhost' || /\.(local|internal|localdomain)$/.test(h)) return false;
+  if (h.indexOf('[') === 0) return false;   // IPv6 리터럴
+  for (var i = 0; i < ALLOW_HOSTS.length; i++) {
+    if (h === ALLOW_HOSTS[i]) return true;
+  }
+  return false;
+}
+
 /* ---------- 시트 준비 ---------- */
 function sheet_(name, headers) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -137,6 +190,7 @@ function doPost(e) {
     }
 
     if (type === 'expense-del') {
+      if (!hasWriteKey_(body)) return json_({ error: '권한이 없어요' });
       return deleteById_(expensesSheet_(), body.id);
     }
 
@@ -151,11 +205,13 @@ function doPost(e) {
     }
 
     if (type === 'item-del') {
+      if (!hasWriteKey_(body)) return json_({ error: '권한이 없어요' });
       return deleteById_(itemsSheet_(), body.id);
     }
 
     /* ---------- 일정표 등 통짜 문서 ---------- */
     if (type === 'doc-set') {
+      if (!hasWriteKey_(body)) return json_({ error: '권한이 없어요' });
       if (!body.key) return json_({ error: 'key 누락' });
       var sd = docsSheet_();
       var data2 = JSON.stringify(body.data == null ? null : body.data).slice(0, 40000);
@@ -278,6 +334,9 @@ function addressFromHtml_(html) {
 
 function resolveLink_(url) {
   if (!/^https?:\/\//i.test(url)) return { error: '주소 형식이 아니에요' };
+  if (!allowedHost_(url)) {
+    return { error: '네이버 지도·네이버 예약·에어비앤비 링크만 자동으로 찾을 수 있어요. 지도에서 찍어주세요.' };
+  }
 
   try {
     // 리다이렉트를 직접 따라가며, 중간 주소에 좌표가 있는지 봅니다
@@ -297,6 +356,12 @@ function resolveLink_(url) {
 
       var hit = fromRedirect_(loc);
       if (hit) return hit;
+
+      // 리다이렉트가 허용 밖으로 나가면 따라가지 않습니다.
+      // (좌표 추출은 주소 문자열만 보므로 위에서 이미 끝났습니다)
+      if (!allowedHost_(loc)) {
+        return { error: '이 링크에서는 위치를 못 찾았어요. 지도에서 찍어주세요.' };
+      }
 
       current = loc;
       hops++;

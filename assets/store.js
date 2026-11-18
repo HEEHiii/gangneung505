@@ -12,6 +12,16 @@
 
 const ENDPOINT = "https://script.google.com/macros/s/AKfycbxghaqYFNl26PbYbQ31itcDfza7rERna43b2bxulB9QYSWNksZxGBsmsG5bsgHtcjMkow/exec";
 
+/* ---------- 쓰기 보호 ----------
+   지우기와 일정표 덮어쓰기에만 함께 보내는 문자열입니다.
+   페이지 소스에 들어가니 완전히 숨길 수는 없고, 주소만 긁어가는
+   봇과 장난을 막는 용도입니다. 읽기와 투표는 그대로 열려 있어서
+   친구들이 쓰던 흐름은 아무것도 바뀌지 않습니다.
+
+   ★ apps-script/Code.gs 의 WRITE_KEY 와 같은 값이어야 합니다.
+      한쪽만 바꾸면 삭제와 일정 저장이 "권한이 없어요"로 실패합니다. */
+const WRITE_KEY = "gn505-wr-7Qk2mXb9Rt4Z";
+
 /* ---------- 익명 식별자 ----------
    이름을 받지 않습니다. 중복 투표만 막기 위한 임의의 난수이고
    서버에도 이 난수만 남습니다. 누가 뭘 눌렀는지 알 수 없습니다. */
@@ -129,7 +139,7 @@ const Store = (() => {
         local.write("expenses", local.read("expenses", []).filter(x => x.id !== id));
         return;
       }
-      await call({ type: "expense-del" }, { id });
+      await call({ type: "expense-del" }, { id, wk: WRITE_KEY });
     },
 
     /* ---------- 친구들이 추가한 숙소 · 맛집 ----------
@@ -149,7 +159,7 @@ const Store = (() => {
         local.write("items", local.read("items", []).filter(x => x.id !== id));
         return;
       }
-      await call({ type: "item-del" }, { id });
+      await call({ type: "item-del" }, { id, wk: WRITE_KEY });
     },
 
     /* ---------- 링크에서 이름·좌표 알아내기 ----------
@@ -184,7 +194,7 @@ const Store = (() => {
         local.write("docs", { ...local.read("docs", {}), [key]: data });
         return;
       }
-      await call({ type: "doc-set" }, { key, data });
+      await call({ type: "doc-set" }, { key, data, wk: WRITE_KEY });
     },
   };
 })();
