@@ -45,6 +45,7 @@ const URL_ = read("SUPABASE_URL");
 const KEY = read("SUPABASE_ANON_KEY");
 const KAKAO = read("KAKAO_JS_KEY");
 const R2 = read("R2_PUBLIC_BASE");
+const PROVIDER = read("LOGIN_PROVIDER");
 
 console.log("── 네 줄이 제자리에 있는지");
 for (const [n, v] of [["SUPABASE_URL", URL_], ["SUPABASE_ANON_KEY", KEY],
@@ -86,6 +87,15 @@ if (KAKAO) {
 ok(!KEY.startsWith("sb_") || KEY.startsWith("sb_publishable_"),
   "Supabase 키는 publishable 이거나 옛 anon 형식");
 
+/* ---------- 1-2. 로그인 서비스 ---------- */
+console.log("── 방장 로그인 서비스");
+const KNOWN = ["google", "github", "kakao"];
+ok(KNOWN.includes(PROVIDER),
+  `LOGIN_PROVIDER 가 아는 값  (지금 ${JSON.stringify(PROVIDER)})`);
+if (PROVIDER === "kakao") {
+  console.log("  참고   카카오는 비즈앱 전환이 끝난 뒤에만 됩니다 (KOE205)");
+}
+
 /* ---------- 2. 반쪽만 채운 상태 ---------- */
 console.log("── 반쪽만 채워서 조용히 꺼지지 않는지");
 ok(!!URL_ === !!KEY,
@@ -110,6 +120,7 @@ console.log("── 지금 상태");
 console.log(`  저장   ${URL_ && KEY ? "Supabase 서버 (친구와 합쳐짐)" : "이 브라우저에만"}`);
 console.log(`  지도   ${KAKAO ? "카카오 지도" : "안내판으로 대체"}`);
 console.log(`  갤러리 ${R2 ? "켜짐" : "숨김 (3단계)"}`);
+console.log(`  로그인 ${PROVIDER}`);
 
 console.log("");
 if (fails === 0) console.log("전부 통과");

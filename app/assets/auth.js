@@ -1,5 +1,5 @@
 /* ============================================================
-   auth.js — 카카오 로그인 (방장만)
+   auth.js — 방장 로그인 (구글 또는 카카오 — config.js 에서 고릅니다)
 
    ★ 친구들은 로그인하지 않습니다.
      링크 + 방 비밀번호로 들어옵니다. 초대받은 사람에게 로그인을
@@ -18,7 +18,7 @@
    ============================================================ */
 
 import { getClient } from "./supa.js";
-import { hasBackend } from "./config.js";
+import { hasBackend, LOGIN_PROVIDER, loginName } from "./config.js";
 import { newId } from "./session.js";
 
 /* ============================================================
@@ -126,15 +126,15 @@ export function sweepPending() {
 
 
 /* ============================================================
-   카카오로 보내기
+   로그인 서비스로 보내기
 
    돌려주는 값:
      "already"  이미 로그인돼 있음 → 리다이렉트 없이 바로 진행
-     "sent"     카카오로 떠났음 (이 뒤 코드는 실행되지 않습니다)
+     "sent"     로그인 서비스로 떠났음 (이 뒤 코드는 실행되지 않습니다)
      "off"      서버 설정이 없음 → 로컬 모드로 진행
      "error"    실패 — 사용자에게 알려야 합니다
    ============================================================ */
-export async function signInWithKakao(form) {
+export async function signIn(form) {
   if (!hasBackend()) return { state: "off" };
 
   const c = await getClient();
@@ -160,16 +160,16 @@ export async function signInWithKakao(form) {
 
   try {
     const { error } = await c.auth.signInWithOAuth({
-      provider: "kakao",
+      provider: LOGIN_PROVIDER,
       options: { redirectTo: back.toString() },
     });
     if (error) throw error;
     return { state: "sent" };
   } catch (e) {
-    console.warn("[로그인] 카카오로 보내지 못했습니다", e);
+    console.warn(`[로그인] ${LOGIN_PROVIDER} 로 보내지 못했습니다`, e);
     return {
       state: "error",
-      message: "카카오 로그인을 시작할 수 없어요. 잠시 뒤에 다시 시도해주세요.",
+      message: `${loginName()} 로그인을 시작할 수 없어요. 잠시 뒤에 다시 시도해주세요.`,
     };
   }
 }

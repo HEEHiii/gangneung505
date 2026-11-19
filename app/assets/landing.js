@@ -3,7 +3,7 @@
 
    하는 일
      1. 폼을 채우고 검증
-     2. (서버 모드면) 카카오 로그인 — ★ 폼을 다 채운 뒤에
+     2. (서버 모드면) 방장 로그인 — ★ 폼을 다 채운 뒤에
      3. 방 만들기 → 공유 링크
 
    ★ 로그인 벽의 위치가 중요합니다.
@@ -14,10 +14,10 @@
 
 import { REGIONS, regionByCode, seasonFor, THEMES } from "./regions.js";
 import { $, $$, esc, toast, fmtRange, copyText, enumerateDays } from "./dom.js";
-import { hasBackend, hasMap, roomUrl, KAKAO_JS_KEY } from "./config.js";
+import { hasBackend, hasMap, roomUrl, KAKAO_JS_KEY, loginName } from "./config.js";
 import { loadKakao, kakaoReady } from "./kakaomap.js";
 import { searchByKeyword, findHub } from "./places.js";
-import { currentUser, signInWithKakao, readReturn, sweepPending, signOut } from "./auth.js";
+import { currentUser, signIn, readReturn, sweepPending, signOut } from "./auth.js";
 import { createRoom, listMyRooms } from "./store.js";
 import { rememberRoom, recentRooms } from "./session.js";
 
@@ -315,7 +315,7 @@ async function boot() {
   if (!hasMap()) bits.push("지도 키가 없어 <strong>지도 없이</strong> 동작해요");
   $("#mode-note").innerHTML = bits.join(" · ");
   $("#login-note").innerHTML = hasBackend()
-    ? "방을 만들 때 <strong>카카오 로그인</strong>을 한 번 합니다. 친구들은 로그인하지 않아요."
+    ? `방을 만들 때 <strong>${loginName()} 로그인</strong>을 한 번 합니다. 친구들은 로그인하지 않아요.`
     : "";
 
   /* 이벤트 */
@@ -349,7 +349,7 @@ async function boot() {
     // 로컬 모드면 로그인 없이 바로
     if (!hasBackend()) return make(form);
 
-    const r = await signInWithKakao(form);
+    const r = await signIn(form);
     if (r.state === "sent") return;             // 카카오로 떠났습니다
     if (r.state === "error") return showError(r.message);
     return make(form);                           // already / off

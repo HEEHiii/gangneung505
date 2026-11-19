@@ -9,7 +9,7 @@
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY, hasBackend } from "./config.js";
 
-/* supabase-js 는 Auth(카카오 로그인, PKCE, 토큰 갱신) 때문에 씁니다.
+/* supabase-js 는 Auth(방장 로그인, PKCE, 토큰 갱신) 때문에 씁니다.
    그건 직접 만들 만한 것이 아닙니다. 버전을 정확히 못박아 둡니다. */
 const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/+esm";
 
@@ -168,7 +168,7 @@ export async function rpc(fn, args = {}) {
   if (NEEDS_LOGIN.has(fn)) {
     const { data } = await client.auth.getSession();
     if (!data || !data.session) {
-      throw new RpcError("auth", "카카오 로그인이 필요해요.", "no session");
+      throw new RpcError("auth", "로그인이 필요해요.", "no session");
     }
   }
 
