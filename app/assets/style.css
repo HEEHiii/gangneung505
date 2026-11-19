@@ -121,6 +121,11 @@
    (실제로 "장소 검색" 상자가 늘 떠 있었습니다).
    탭 패널도 hidden 으로 여닫으므로 여기서 한 번에 막아둡니다. */
 [hidden]{display:none !important}
+
+/* ★ 한국어는 단어 중간에서 줄을 바꾸면 안 됩니다.
+   기본값(break-word 성격)이면 "짜보세 / 요" 처럼 잘립니다.
+   keep-all 이 한국어에 맞는 설정이고, 띄어쓰기에서만 넘어갑니다. */
+html{word-break:keep-all;overflow-wrap:break-word}
 html,body{margin:0;padding:0}
 body{
   background:var(--bg);
