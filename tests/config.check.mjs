@@ -76,6 +76,13 @@ ok(role !== "service_role",
    대신 "여기 들어오면 안 되는 것"만 막습니다. */
 ok(!/^ey[A-Za-z0-9_-]+\./.test(KAKAO), "KAKAO_JS_KEY 자리에 JWT 가 들어있지 않음");
 ok(!KAKAO.startsWith("sb_"), "KAKAO_JS_KEY 자리에 Supabase 키가 들어있지 않음");
+
+/* 카카오 앱 키는 소문자 16진수 32자입니다. 복사하다 잘리거나 앞뒤에
+   공백이 묻는 사고가 흔한데, 그러면 지도가 조용히 안 뜹니다. */
+if (KAKAO) {
+  ok(/^[0-9a-f]{32}$/.test(KAKAO),
+    `KAKAO_JS_KEY 가 카카오 키 모양 (소문자 16진수 32자, 지금 ${KAKAO.length}자)`);
+}
 ok(!KEY.startsWith("sb_") || KEY.startsWith("sb_publishable_"),
   "Supabase 키는 publishable 이거나 옛 anon 형식");
 

@@ -42,7 +42,7 @@ export const SUPABASE_ANON_KEY = "sb_publishable_wup-58Iico2mODpqWmWubQ_nR1AzQNu
           https://<내아이디>.github.io
           http://localhost:8080        ← 없으면 로컬 테스트가 조용히 실패
    ------------------------------------------------------------ */
-export const KAKAO_JS_KEY = "";
+export const KAKAO_JS_KEY = "e23289f2dcaab6a5e4a84be7808dadf5";
 
 
 /* ------------------------------------------------------------
