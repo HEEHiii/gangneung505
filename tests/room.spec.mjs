@@ -12,6 +12,7 @@ const { chromium } = createRequire(import.meta.url)("playwright");
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { stubConfig } from "./stub-config.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.BASE || "http://localhost:8080";
@@ -50,6 +51,8 @@ async function fresh(opts = {}) {
     viewport: { width: 420, height: 900 },
     colorScheme: opts.scheme || "light",
   });
+  /* 진짜 config.js 대신 테스트가 정한 값 (기본: 전부 비움) */
+  await stubConfig(ctx, opts.config);
   await ctx.addInitScript({ content: STUB });
   await ctx.addInitScript({ content: `window.__stubPlaces = ${JSON.stringify(PLACES)};` });
   const page = await ctx.newPage();
@@ -417,6 +420,7 @@ function roomUrlWithHash(current, tab) {
 {
   console.log("── 지도 키가 없을 때");
   const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
+  await stubConfig(ctx);
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));

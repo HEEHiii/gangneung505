@@ -9,6 +9,7 @@
    ============================================================ */
 
 import { createRequire } from "node:module";
+import { stubConfig } from "./stub-config.mjs";
 const { chromium } = createRequire(import.meta.url)("playwright");
 
 const BASE = process.env.BASE || "http://localhost:8080";
@@ -23,6 +24,8 @@ const eq = (got, want, what) =>
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext();
+/* 진짜 config.js 가 채워져도 이 테스트는 "설정 없음" 상태를 봅니다 */
+await stubConfig(ctx);
 const page = await ctx.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));

@@ -3,7 +3,8 @@
 
    실행: bash tests/run-browser.sh landing
 
-   설정이 비어 있는 "이 브라우저에만 저장" 모드로 돕니다.
+   config.js 를 테스트가 갈아끼워 "이 브라우저에만 저장" 모드로 돕니다
+   (→ tests/stub-config.mjs). 진짜 키가 채워져 있어도 결과가 같습니다.
    그래서 카카오 로그인 없이 방 만들기 흐름 전체를 확인할 수 있습니다.
    ============================================================ */
 
@@ -12,6 +13,7 @@ const { chromium } = createRequire(import.meta.url)("playwright");
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { stubConfig } from "./stub-config.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.BASE || "http://localhost:8080";
@@ -32,6 +34,9 @@ async function open(opts = {}) {
     viewport: { width: 420, height: 900 },
     colorScheme: opts.scheme || "light",
   });
+  /* 진짜 config.js 대신 테스트가 정한 값을 씁니다 (기본: 전부 비움).
+     이게 없으면 사장님이 키를 넣는 순간 테스트가 깨집니다. */
+  await stubConfig(ctx, opts.config);
   if (opts.kakao) {
     await ctx.addInitScript({ content: STUB });
     await ctx.addInitScript({

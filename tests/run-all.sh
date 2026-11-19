@@ -4,7 +4,8 @@
 #
 #  실행:  bash tests/run-all.sh
 #
-#  네 묶음입니다.
+#  묶음별로 나눠 돕니다.
+#    0) 설정 검사      config.js 에 비밀 키가 섞였는지, 반쪽만 찼는지
 #    1) 데이터 검증    지역·좌표 파일의 손으로 적은 값
 #    2) 순수 함수      거리·날짜·좌표 계산
 #    3) 계약 검증      JS 가 보내는 인자와 SQL 함수 서명이 같은지
@@ -30,6 +31,7 @@ step() {
   fi
 }
 
+step "설정 (config.js)"  node tests/config.check.mjs
 step "지역·POI 데이터"   node tests/regions.check.mjs
 step "순수 함수"         node tests/util.check.mjs
 step "링크 파싱"         node tests/places.check.mjs

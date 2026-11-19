@@ -20,11 +20,17 @@
       supabase.com 에서 프로젝트를 만들고 (지역은 Seoul 권장)
       Project Settings → API 에서 두 값을 복사해 넣으세요.
 
-      Project URL  → SUPABASE_URL
-      anon public  → SUPABASE_ANON_KEY   (service_role 아님!)
+      Project Settings → "API Keys" 메뉴  (General 아님, JWT Keys 아님)
+
+      Project URL              → SUPABASE_URL
+      anon public              → SUPABASE_ANON_KEY
+        또는 sb_publishable_…  → SUPABASE_ANON_KEY   (새 형식, 같은 자리)
+
+      ⚠️ service_role / sb_secret_… 은 절대 넣지 마세요.
+         모든 잠금을 무시하는 키라 누구나 전체 데이터를 지울 수 있습니다.
    ------------------------------------------------------------ */
-export const SUPABASE_URL = "";
-export const SUPABASE_ANON_KEY = "";
+export const SUPABASE_URL = "https://iprdjwxcqwtqvksponlg.supabase.co";
+export const SUPABASE_ANON_KEY = "sb_publishable_wup-58Iico2mODpqWmWubQ_nR1AzQNu";
 
 
 /* ------------------------------------------------------------
