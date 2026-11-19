@@ -16,7 +16,14 @@
 import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)("playwright");
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.BASE || "http://localhost:8080";
+
+const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 
 let fails = 0;
 const ok = (cond, what) => {
@@ -157,6 +164,56 @@ console.log("── 테마 적용");
   eq(defined.join(","), "spring,summer,autumn,winter", "CSS 에 네 계절이 모두 정의됨");
 
   await ctx.close();
+}
+
+/* ============================================================
+   겨울은 기기 설정과 무관하게 항상 어둡다
+
+   ★ 계절이 색뿐 아니라 분위기까지 정하게 한 선택입니다.
+     나머지 세 계절은 기기 설정을 따라가므로, 이 둘이 섞이지 않는지
+     확인해야 합니다. 겨울이 밝아지거나, 다른 계절이 기기를 무시하면
+     "고를 때 본 색과 실제 화면이 다르다"가 됩니다.
+   ============================================================ */
+console.log("── 겨울은 항상 어둡게");
+{
+  const read = async (scheme, theme) => {
+    const ctx = await browser.newContext({ colorScheme: scheme });
+    const page = await ctx.newPage();
+    await page.goto(`${BASE}/tests/fixtures/theme.html`);
+    await page.waitForFunction(() => window.__ready === true);
+    const r = await page.evaluate((t) => {
+      window.setTheme(t);
+      return {
+        bg: window.cs("body", "background-color"),
+        text: window.cs("#body-text", "color"),
+        scheme: window.tok("--on-dark"),
+      };
+    }, theme);
+    await ctx.close();
+    return r;
+  };
+
+  const wL = await read("light", "winter");
+  const wD = await read("dark", "winter");
+  eq(wL.bg, wD.bg, "겨울 배경이 기기 설정과 무관하게 같다");
+  ok(lum(parseRgb(wL.bg)) < 0.1, `겨울은 밝은 기기에서도 어둡다  (${wL.bg})`);
+  ok(contrast(wL.text, wL.bg) >= 4.5,
+    `겨울(밝은 기기) 본문 대비 ${contrast(wL.text, wL.bg).toFixed(2)}:1`);
+
+  /* 나머지 셋은 기기 설정을 그대로 따라가야 합니다 */
+  for (const s of ["spring", "summer", "autumn"]) {
+    const a = await read("light", s);
+    const b = await read("dark", s);
+    ok(a.bg !== b.bg, `${s} 은 기기 설정을 따라간다`);
+    ok(lum(parseRgb(a.bg)) > 0.7, `${s} 은 밝은 기기에서 밝다`);
+    ok(lum(parseRgb(b.bg)) < 0.1, `${s} 은 어두운 기기에서 어둡다`);
+  }
+
+  /* 고를 때 보이는 색 견본도 어두워야 합니다 — 아니면 고른 것과 다른 게 나옵니다 */
+  const css = readFileSync(join(HERE, "..", "app", "assets", "style.css"), "utf8");
+  const sw = css.match(/\.swatch-winter\{background:(#[0-9a-f]{6})/i);
+  ok(sw && lum(hexToRgb(sw[1])) < 0.15,
+    `겨울 색 견본도 어둡다  (${sw ? sw[1] : "못 찾음"})`);
 }
 
 await browser.close();
