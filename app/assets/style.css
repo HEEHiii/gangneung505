@@ -817,8 +817,3 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 }
 .btn-danger:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 
-/* 게이트에 여행 정보를 띄울 때 쓰는 한 줄 */
-.gate-meta{
-  display:block;margin-bottom:6px;
-  font-size:13px;font-weight:600;color:var(--accent);
-}

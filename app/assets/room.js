@@ -93,14 +93,9 @@ function applyPeek(info) {
   document.title = `${info.title} — 여행방`;
   $("#gate-title").textContent = info.title;
 
-  const bits = [];
-  if (info.start_date && info.end_date) bits.push(fmtRange(info.start_date, info.end_date));
-  if (info.region_name) bits.push(info.region_name);
-  if (info.people) bits.push(`${info.people}명`);
-
-  $("#gate-sub").innerHTML =
-    (bits.length ? `<span class="gate-meta">${esc(bits.join(" · "))}</span>` : "") +
-    "친구에게 받은 비밀번호를 넣어주세요.";
+  /* 날짜·지역·인원은 일부러 보여주지 않습니다.
+     들어가면 바로 보이는 것들이고, 비밀번호 앞에서는 "여기가 맞나"만
+     확인되면 충분합니다. 서버도 이 값들을 아예 보내지 않습니다. */
 
   // 방을 만들 때 고른 계절을 게이트부터 적용합니다
   if (info.theme && THEMES.some((t) => t.key === info.theme)) {

@@ -106,10 +106,13 @@ let roomUrl = "";
   eq(await page.locator("#gate-title").textContent(), "겨울 강릉",
     "비밀번호 화면에 여행 이름이 뜬다");
   const sub = await page.locator("#gate-sub").textContent();
-  ok(sub.includes("1박 2일"), `기간도 함께  (${sub.split("친구")[0].trim()})`);
-  ok(sub.includes("강릉"), "지역도 함께");
-  ok(sub.includes("4명"), "인원도 함께");
-  ok(sub.includes("비밀번호"), "무엇을 해야 하는지도 여전히 안내");
+  ok(sub.includes("비밀번호"), "무엇을 해야 하는지 안내");
+
+  /* ★ 이름만 보여주고 나머지는 들어가서 봅니다.
+     보내지 않은 값은 샐 수가 없으므로 서버도 아예 안 보냅니다. */
+  ok(!sub.includes("1박"), "기간은 비밀번호 앞에서 안 보인다");
+  ok(!sub.includes("강릉"), "지역은 비밀번호 앞에서 안 보인다");
+  ok(!sub.includes("4명"), "인원은 비밀번호 앞에서 안 보인다");
   eq(await page.title(), "겨울 강릉 — 여행방", "브라우저 탭 제목도 바뀐다");
 
   /* 1월 여행이므로 겨울 테마가 게이트부터 적용되어야 합니다 */

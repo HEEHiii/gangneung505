@@ -298,9 +298,6 @@ set role anon;
 insert into t select 'peek', (public.room_peek((select v from t where k = 'slug1')))::text;
 
 select pg_temp.ok((select v::jsonb ->> 'title' from t where k = 'peek') = '겨울 강릉', '여행 이름이 보인다');
-select pg_temp.ok((select v::jsonb ->> 'region_name' from t where k = 'peek') = '강릉', '지역이 보인다');
-select pg_temp.ok((select v::jsonb ->> 'start_date' from t where k = 'peek') = '2027-01-23', '날짜가 보인다');
-select pg_temp.ok((select (v::jsonb ->> 'people')::int from t where k = 'peek') = 4, '인원이 보인다');
 select pg_temp.ok((select v::jsonb ->> 'theme' from t where k = 'peek') = 'winter', '테마가 보인다 (게이트부터 계절 적용)');
 
 /* ★ 여기부터가 핵심입니다 — 내용은 비밀번호 뒤에 남아야 합니다.
@@ -311,9 +308,16 @@ select pg_temp.ok((select position('places' in v) = 0 from t where k = 'peek'), 
 select pg_temp.ok((select position('counts' in v) = 0 from t where k = 'peek'), '투표 집계가 없다');
 select pg_temp.ok((select position('voter'  in v) = 0 from t where k = 'peek'), '투표자 정보가 없다');
 select pg_temp.ok((select position('hub'    in v) = 0 from t where k = 'peek'), '출발 지점 좌표도 없다');
+/* 제목에 지역 이름이 들어가는 경우가 많으므로("겨울 강릉") 문자열로
+   찾으면 안 되고, 어떤 키를 돌려주는지로 확인해야 합니다. */
+select pg_temp.ok((select v::jsonb ? 'start_date' from t where k = 'peek') = false, '날짜 키가 없다');
+select pg_temp.ok((select v::jsonb ? 'end_date'   from t where k = 'peek') = false, '종료일 키가 없다');
+select pg_temp.ok((select v::jsonb ? 'region_name' from t where k = 'peek') = false, '지역 키가 없다');
+select pg_temp.ok((select v::jsonb ? 'people'     from t where k = 'peek') = false, '인원 키가 없다');
+select pg_temp.ok((select v::jsonb ? 'hub'        from t where k = 'peek') = false, 'hub 키가 없다');
 select pg_temp.ok(
-  (select count(*) from jsonb_object_keys((select v::jsonb from t where k = 'peek'))) = 6,
-  '돌려주는 항목이 정확히 6개 (이름·지역·시작·종료·인원·테마)');
+  (select count(*) from jsonb_object_keys((select v::jsonb from t where k = 'peek'))) = 2,
+  '돌려주는 항목이 정확히 2개 (이름·테마) — 화면에 안 쓰는 값은 보내지 않는다');
 
 -- 없는 방과 이상한 주소는 조용히 null
 select pg_temp.ok(public.room_peek('ZZZZZZZZZ') is null, '없는 방은 null');
