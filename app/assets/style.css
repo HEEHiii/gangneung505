@@ -13,7 +13,9 @@
      계절 네 개 × (밝게/어둡게) 여덟 벌이고, 어두운 쪽은
      prefers-color-scheme 를 따릅니다.
    ============================================================ */
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+/* 제목은 손글씨(개구), 본문은 부드러운 고딕(고운돋움).
+   여행 수첩 느낌을 내면서 본문은 읽기 편해야 하므로 둘을 나눴습니다. */
+@import url("https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Gowun+Dodum&display=swap");
 
 :root{
   /* 테마와 무관한 값 */
@@ -32,84 +34,90 @@
   --shadow-xl:var(--shadow-xl);
 }
 
+/* ============================================================
+   계절 파스텔 4종
+
+   바탕은 연하게, 글씨와 강조는 충분히 진하게.
+   "파스텔"은 배경 이야기이고, 글씨까지 연해지면 안 읽힙니다.
+   tests/theme.spec.mjs 가 여덟 벌 전부 대비를 재서 막아줍니다.
+   ============================================================ */
+
 /* ───────── 여름 (기본) ───────── */
 :root,
 :root[data-theme="summer"]{
   color-scheme:light;
-  --bg:#ffffff; --surface:#f7fbfd; --surface-2:#eef6fa;
-  --line:#e0edf3; --line-strong:#c9dde7;
-  --text:#16202a; --muted:#64757f; --faint:#a9b6bf;
-  --accent:#0d6f93; --accent-soft:#e4f3f9; --on-dark:#ffffff;
+  --bg:#f7fcfd; --surface:#ffffff; --surface-2:#e8f4f9;
+  --line:#d8e9f0; --line-strong:#b3d2df;
+  --text:#1b2a33; --muted:#5b7280; --faint:#a7bcc7;
+  --accent:#26718c; --accent-soft:#e2f1f7; --on-dark:#ffffff;
   --danger:#b3382a; --ok:#1a7f4b;
 }
 
 /* ───────── 봄 ───────── */
 :root[data-theme="spring"]{
   color-scheme:light;
-  --bg:#fffdfd; --surface:#fff7f8; --surface-2:#fdeef1;
-  --line:#f3e3e6; --line-strong:#e6ccd2;
-  --text:#2a1f22; --muted:#80686f; --faint:#c3aeb4;
-  --accent:#c14b68; --accent-soft:#fdeef2; --on-dark:#ffffff;
+  --bg:#fffbfc; --surface:#ffffff; --surface-2:#fbe9ee;
+  --line:#f5dde4; --line-strong:#e6bfca;
+  --text:#32232a; --muted:#7d6069; --faint:#c4a9b2;
+  --accent:#b05570; --accent-soft:#fcecf0; --on-dark:#ffffff;
   --danger:#b3382a; --ok:#1a7f4b;
 }
 
 /* ───────── 가을 ───────── */
 :root[data-theme="autumn"]{
   color-scheme:light;
-  --bg:#fffdfa; --surface:#fdf8f1; --surface-2:#faf0e3;
-  --line:#f0e3d2; --line-strong:#ddc9ae;
-  --text:#2a2018; --muted:#7d6e5c; --faint:#c2b29c;
-  --accent:#a8521a; --accent-soft:#fcefe2; --on-dark:#ffffff;
+  --bg:#fffdf8; --surface:#ffffff; --surface-2:#f9ecdb;
+  --line:#f0e1cb; --line-strong:#ddc5a4;
+  --text:#332619; --muted:#7a6650; --faint:#c0ac95;
+  --accent:#975e26; --accent-soft:#fbefe0; --on-dark:#ffffff;
   --danger:#b3382a; --ok:#1a7f4b;
 }
 
 /* ───────── 겨울 ───────── */
 :root[data-theme="winter"]{
   color-scheme:light;
-  /* 배경을 차가운 회백색으로 두고 카드를 흰색으로 띄웁니다.
-     여름도 흰 배경이라, 둘 다 순백이면 테마를 바꿔도 달라 보이지
-     않습니다 (테스트가 "배경색이 겹친다"로 잡아냈습니다). */
-  --bg:#f6f8fa; --surface:#ffffff; --surface-2:#eaeff4;
-  --line:#dde5ec; --line-strong:#c4d0da;
-  --text:#1a1f24; --muted:#5e6a75; --faint:#a4aeb8;
-  --accent:#2f5e92; --accent-soft:#eaf1f8; --on-dark:#ffffff;
+  --bg:#f8fbfc; --surface:#ffffff; --surface-2:#e9f0f6;
+  --line:#dce7ef; --line-strong:#bfd0dd;
+  --text:#1f2a33; --muted:#5e7180; --faint:#a9b9c6;
+  --accent:#4a7799; --accent-soft:#e9f1f7; --on-dark:#ffffff;
   --danger:#b3382a; --ok:#1a7f4b;
 }
 
-/* ───────── 어두울 때 ───────── */
+/* ───────── 어두울 때 ─────────
+   어두운 쪽도 색을 눕혀서(채도를 낮춰) 파스텔 느낌을 이어갑니다. */
 @media (prefers-color-scheme: dark){
   :root,
   :root[data-theme="summer"]{
     color-scheme:dark;
-    --bg:#0f1720; --surface:#16202a; --surface-2:#1d2935;
-    --line:#27353f; --line-strong:#3a4a57;
-    --text:#e6f0f6; --muted:#9db2bf; --faint:#5c6a75;
-    --accent:#54c4ea; --accent-soft:#16323f; --on-dark:#0f1720;
-    --danger:#ff8a7a; --ok:#5ed39a;
+    --bg:#141d23; --surface:#1b262e; --surface-2:#223039;
+    --line:#2c3b45; --line-strong:#415360;
+    --text:#e4eef3; --muted:#9db2bf; --faint:#5f7079;
+    --accent:#86c8de; --accent-soft:#1e3540; --on-dark:#141d23;
+    --danger:#ff9a8b; --ok:#7fd9ab;
   }
   :root[data-theme="spring"]{
     color-scheme:dark;
-    --bg:#1a1416; --surface:#221a1d; --surface-2:#2b2125;
-    --line:#352a2e; --line-strong:#4a3a3f;
-    --text:#f3e9ec; --muted:#b9a1a8; --faint:#6e5a60;
-    --accent:#f49ab0; --accent-soft:#3a262c; --on-dark:#1a1416;
-    --danger:#ff8a7a; --ok:#5ed39a;
+    --bg:#1e1619; --surface:#271d21; --surface-2:#302429;
+    --line:#3a2d32; --line-strong:#503f45;
+    --text:#f4e8ec; --muted:#bda3ab; --faint:#776168;
+    --accent:#f0a9ba; --accent-soft:#3b2930; --on-dark:#1e1619;
+    --danger:#ff9a8b; --ok:#7fd9ab;
   }
   :root[data-theme="autumn"]{
     color-scheme:dark;
-    --bg:#1a1510; --surface:#221c15; --surface-2:#2b241b;
-    --line:#352c22; --line-strong:#4a3e30;
-    --text:#f4ece2; --muted:#bdac98; --faint:#71634f;
-    --accent:#f39a55; --accent-soft:#3a2a1b; --on-dark:#1a1510;
-    --danger:#ff8a7a; --ok:#5ed39a;
+    --bg:#1e1812; --surface:#271f17; --surface-2:#30271d;
+    --line:#3a3025; --line-strong:#504234;
+    --text:#f5ece0; --muted:#bfad97; --faint:#7a6a57;
+    --accent:#eeab73; --accent-soft:#3b2c1d; --on-dark:#1e1812;
+    --danger:#ff9a8b; --ok:#7fd9ab;
   }
   :root[data-theme="winter"]{
     color-scheme:dark;
-    --bg:#11161b; --surface:#182027; --surface-2:#1f2932;
-    --line:#2a353e; --line-strong:#3d4b56;
-    --text:#e9eff4; --muted:#9dacb8; --faint:#5b6873;
-    --accent:#86b6e6; --accent-soft:#1b2c3c; --on-dark:#11161b;
-    --danger:#ff8a7a; --ok:#5ed39a;
+    --bg:#151b21; --surface:#1c242b; --surface-2:#232d36;
+    --line:#2d3942; --line-strong:#41505c;
+    --text:#e7eef4; --muted:#9fafbb; --faint:#5f6e79;
+    --accent:#9dc2e0; --accent-soft:#1e2d3a; --on-dark:#151b21;
+    --danger:#ff9a8b; --ok:#7fd9ab;
   }
 }
 
@@ -130,8 +138,7 @@ html,body{margin:0;padding:0}
 body{
   background:var(--bg);
   color:var(--text);
-  font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,
-              "Segoe UI","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+  font-family:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
   font-size:15px;
   line-height:1.6;
   -webkit-font-smoothing:antialiased;
@@ -633,10 +640,11 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 .theme-opt:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 
 /* 각 계절의 느낌을 작은 색 띠로 보여줍니다 */
-.swatch-spring{background:linear-gradient(135deg,#fdeef1,#c14b68)}
-.swatch-summer{background:linear-gradient(135deg,#e4f3f9,#0d6f93)}
-.swatch-autumn{background:linear-gradient(135deg,#fcefe2,#a8521a)}
-.swatch-winter{background:linear-gradient(135deg,#eaf1f8,#2f5e92)}
+/* 그라데이션 없이 — 연한 바탕에 진한 색 띠를 단색으로 얹습니다 */
+.swatch-spring{background:#fbe4ea; box-shadow:inset 0 -9px 0 #b05570}
+.swatch-summer{background:#dff0f7; box-shadow:inset 0 -9px 0 #2d7f9d}
+.swatch-autumn{background:#f9ead6; box-shadow:inset 0 -9px 0 #a8692e}
+.swatch-winter{background:#e6eef5; box-shadow:inset 0 -9px 0 #4a7799}
 
 
 /* ============================================================
@@ -646,7 +654,7 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 
 .hero{
   padding:40px var(--gutter) 28px;text-align:center;
-  background:linear-gradient(180deg,var(--accent-soft),var(--bg));
+  background:var(--surface-2);   /* 그라데이션 없이 단색 */
   border-bottom:1px solid var(--line);
 }
 .hero-eyebrow{
@@ -822,3 +830,169 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 }
 .btn-danger:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 
+
+
+/* ============================================================
+   종이와 마스킹테이프
+
+   여행 수첩에 붙여놓은 메모 같은 느낌을 노립니다.
+   그라데이션은 쓰지 않습니다 — 색이 번지는 대신 선과 면으로만.
+   ============================================================ */
+
+/* 줄 노트 — 색이 번지는 게 아니라 선입니다 (하드 스톱) */
+body{
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 27px,
+      color-mix(in srgb, var(--line-strong) 38%, transparent) 27px 28px),
+    var(--bg);
+}
+
+/* 첫 화면은 종이 위에 그냥 적은 느낌으로 */
+.hero{
+  background:transparent;
+  border-bottom:2px dashed var(--line-strong);
+}
+.hero-eyebrow{letter-spacing:.16em}
+
+/* ───────── 종이 조각 ─────────
+   얇은 테두리 + 각진 그림자. 흐린 그림자를 쓰면 종이가 아니라
+   앱 카드처럼 보입니다. */
+.card,
+.soon,
+.dlg-box{
+  position:relative;
+  background:var(--surface);
+  border:1.5px solid var(--text);
+  border-radius:8px;
+  box-shadow:4px 4px 0 var(--line-strong);
+}
+
+/* 마스킹테이프 — 위쪽 가운데 한 장 */
+.card::before,
+.soon::before{
+  content:"";
+  position:absolute;top:-11px;left:50%;
+  width:84px;height:22px;
+  transform:translateX(-50%) rotate(-2deg);
+  background:color-mix(in srgb, var(--accent) 20%, transparent);
+  border-left:1px dashed color-mix(in srgb, var(--text) 22%, transparent);
+  border-right:1px dashed color-mix(in srgb, var(--text) 22%, transparent);
+}
+/* 테이프가 겹치지 않게 카드 사이를 조금 벌립니다 */
+.wrap{gap:26px}
+
+/* ───────── 손글씨 제목 ───────── */
+.hero-title,
+.card-title,
+.gate-title,
+.panel-head h2,
+.brand strong,
+.soon strong{
+  font-family:"Gaegu","Gowun Dodum",system-ui,sans-serif;
+  font-weight:700;
+  letter-spacing:0;
+}
+.hero-title{font-size:34px;line-height:1.3}
+.gate-title{font-size:32px}
+.card-title{font-size:23px}
+.panel-head h2{font-size:24px}
+.brand strong{font-size:21px}
+
+/* ───────── 눌리는 것들 ─────────
+   종이에 도장 찍듯 각진 그림자, 누르면 내려앉습니다. */
+.btn-primary,
+.search-row button,
+.btn-danger,
+#gate-form button{
+  border:1.5px solid var(--text);
+  border-radius:6px;
+  box-shadow:3px 3px 0 var(--text);
+  transition:transform .06s, box-shadow .06s;
+}
+.btn-primary:active,
+.search-row button:active,
+.btn-danger:active,
+#gate-form button:active{
+  transform:translate(3px,3px);
+  box-shadow:0 0 0 var(--text);
+}
+
+/* ───────── 입력칸 ───────── */
+.field input,
+.field select,
+#gate-input{
+  border:1.5px solid var(--line-strong);
+  border-radius:6px;
+  background:var(--bg);
+}
+.field input:focus,
+.field select:focus,
+#gate-input:focus{border-color:var(--text)}
+
+.sub-field{
+  background:transparent;
+  border:1.5px dashed var(--line-strong);
+  border-radius:6px;
+}
+
+/* ───────── 테마 고르기 ───────── */
+.theme-opt{
+  border:1.5px solid var(--line-strong);
+  border-radius:6px;
+  background:var(--surface);
+}
+.theme-opt .swatch{border-radius:4px;border:1px solid var(--line-strong)}
+.theme-opt:has(input:checked){
+  border-color:var(--text);
+  box-shadow:2px 2px 0 var(--text);
+}
+
+/* ───────── 목록 ───────── */
+.cards .card{box-shadow:3px 3px 0 var(--line-strong)}
+.cards .card::before{display:none}   /* 목록 카드까지 테이프를 붙이면 정신없습니다 */
+.pick-list button,
+.room-list a{
+  border:1.5px solid var(--line-strong);
+  border-radius:6px;
+  background:var(--surface);
+}
+.chip{border:1.5px solid var(--line-strong);border-radius:6px}
+
+/* ───────── 지도 ───────── */
+.map{border:1.5px solid var(--text);border-radius:8px}
+.map-legend{border:1.5px solid var(--text);border-radius:6px;overflow:hidden}
+
+/* ───────── 게이트 ───────── */
+.gate-box{
+  background:var(--surface);
+  border:1.5px solid var(--text);
+  border-radius:8px;
+  box-shadow:5px 5px 0 var(--line-strong);
+  position:relative;
+  /* 테두리가 생겼으므로 안쪽 여백이 필요합니다.
+     위쪽은 마스킹테이프가 글씨를 덮지 않도록 더 줍니다. */
+  padding:34px 22px 24px;
+}
+.gate-box .gate-sub{margin-bottom:22px}
+.gate-box .gate-error{margin-bottom:0}
+
+/* 게이트 화면도 같은 줄 노트 위에 올립니다 */
+#gate{
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 27px,
+      color-mix(in srgb, var(--line-strong) 38%, transparent) 27px 28px),
+    var(--bg);
+}
+.gate-box::before{
+  content:"";
+  position:absolute;top:-12px;left:50%;
+  width:96px;height:24px;
+  transform:translateX(-50%) rotate(-2.5deg);
+  background:color-mix(in srgb, var(--accent) 20%, transparent);
+  border-left:1px dashed color-mix(in srgb, var(--text) 22%, transparent);
+  border-right:1px dashed color-mix(in srgb, var(--text) 22%, transparent);
+}
