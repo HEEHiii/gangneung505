@@ -54,12 +54,30 @@ https://iprdjwxcqwtqvksponlg.supabase.co/auth/v1/callback
 ```
 
 ### 표 만들기
-**SQL Editor → New query** 에서 **순서대로** 실행:
 
-1. `supabase/migrations/0001_schema.sql` 내용 **전체** → Run
-2. 새 query 열고 `supabase/migrations/0002_rpc.sql` **전체** → Run
+여행방·장소·투표를 담을 **빈 표**를 만드는 단계입니다.
+긴 글이 적힌 파일 3개를 **순서대로** 복사해서 붙여넣고 실행하면 끝입니다.
 
-둘 다 Success 면 끝. 여러 번 실행해도 안전합니다.
+왼쪽 메뉴 **SQL Editor** → **New query**
+
+아래 링크를 열고 오른쪽 위 **복사 아이콘(Copy raw file)** 을 누른 뒤,
+SQL Editor 에 붙여넣고 **Run** (또는 Ctrl+Enter):
+
+| 순서 | 파일 | 하는 일 |
+|---|---|---|
+| 1 | [`0001_schema.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0001_schema.sql) | 표를 만듭니다 |
+| 2 | [`0002_rpc.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0002_rpc.sql) | 방 만들기·입장·투표 기능 |
+| 3 | [`0003_room_peek.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0003_room_peek.sql) | 비밀번호 화면에 여행 이름 띄우기 |
+
+**하나씩, 순서대로** 하세요. 2번이 1번의 표를 쓰고 3번이 2번을 쓰기 때문에
+순서가 바뀌면 "없는 표입니다" 오류가 납니다.
+
+매번 **New query** 로 새 창을 여는 게 안전합니다 (앞 내용이 섞이지 않게).
+
+셋 다 **Success. No rows returned** 가 뜨면 정상입니다.
+결과가 비어 있는 게 맞습니다 — 표를 "만드는" 명령이라 보여줄 내용이 없습니다.
+
+여러 번 실행해도 안전하니, 중간에 헷갈리면 1번부터 다시 하셔도 됩니다.
 
 ---
 
@@ -118,22 +136,54 @@ https://iprdjwxcqwtqvksponlg.supabase.co/auth/v1/callback
 
 ---
 
+## 4. 키를 파일에 넣기
+
+받은 키 두 개를 **`app/assets/config.js`** 에 적으면 끝입니다.
+컴퓨터에 뭘 설치할 필요 없이 **깃허브 사이트에서 바로** 고칠 수 있습니다.
+
+1. <https://github.com/HEEHiii/gangneung505/blob/main/app/assets/config.js> 열기
+2. 오른쪽 위 **연필 ✏️** 아이콘
+3. 따옴표 사이에 붙여넣기 — **세 줄만** 고칩니다
+
+```js
+export const SUPABASE_URL = "https://iprdjwxcqwtqvksponlg.supabase.co";
+export const SUPABASE_ANON_KEY = "여기에 anon 키";
+export const KAKAO_JS_KEY = "여기에 JavaScript 키";
+```
+
+4. 초록색 **Commit changes** 버튼
+
+1~2분 뒤 사이트에 반영됩니다.
+
+> 이 값들이 깃허브에 그대로 보여도 괜찮습니다.
+> 브라우저가 알아야 작동하는 값이라 원래 숨길 수가 없고,
+> 카카오는 **도메인 등록**으로, Supabase 는 **표 접근 차단**으로 따로 막혀 있습니다.
+>
+> ⚠️ 다만 **`service_role` 키와 카카오 `Client Secret` 은 여기 넣으면 안 됩니다.**
+> 그 둘은 Supabase 설정 화면 안에만 있어야 합니다.
+
+---
+
 ## 다 되면 확인하기
 
-```bash
-bash tests/run-all.sh
-```
+<https://heehiii.github.io/gangneung505/app/> 를 엽니다.
 
-5개 묶음이 전부 통과하면 정상입니다.
+| 보이는 것 | 뜻 |
+|---|---|
+| 첫 화면에 지도 선택과 폼이 뜬다 | 페이지 정상 |
+| 지역을 고르면 **지도가 뜬다** | 카카오 JS 키 ✅ |
+| "방 만들기" 를 누르면 **카카오 로그인 창** | 카카오 로그인 ✅ |
+| 로그인 후 **공유 링크가 나온다** | Supabase ✅ **1단계 완성** |
 
-브라우저로 직접 보려면:
+### 안 되면 어디가 문제인지
 
-```bash
-python3 -m http.server 8080
-```
-
-그리고 `http://localhost:8080/app/index.html` 을 엽니다.
-(ES 모듈이라 파일을 더블클릭하면 안 열립니다 — 웹서버가 필요합니다.)
+- **지도 자리에 안내판만** → 카카오 JS 키가 비었거나, 플랫폼 도메인에
+  `https://heehiii.github.io` 를 안 넣었습니다
+- **"이 브라우저에만 저장" 이라고 뜬다** → `SUPABASE_URL` 또는 `SUPABASE_ANON_KEY` 가 비었습니다
+- **로그인하고 돌아왔는데 아무 일도 안 일어난다** → Supabase 의
+  **URL Configuration** 에 Redirect URLs 를 안 넣었습니다 (3번 항목)
+- **"로그인이 필요해요" 만 반복** → Supabase 의 Kakao Provider 가 꺼져 있거나
+  REST 키·Client Secret 이 틀렸습니다
 
 ---
 
