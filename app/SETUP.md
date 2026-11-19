@@ -104,9 +104,26 @@ SQL Editor 에 붙여넣고 **Run** (또는 Ctrl+Enter):
 
 > ⚠️ 옆에 있는 **REST API 키가 아닙니다.** 지도는 JavaScript 키만 받습니다.
 
-4. **플랫폼 → Web → 사이트 도메인**에 **둘 다** 등록
+4. **앱 → 플랫폼 키 → `Default JS Key`** 카드의 **JavaScript SDK 도메인**에 등록
    - `https://heehiii.github.io`
    - `http://localhost:8080` ← 없으면 로컬 테스트가 조용히 실패합니다
+   - 입력 후 **맨 아래 저장** 까지 눌러야 반영됩니다
+
+   > ⚠️ 옛 안내서에 나오는 "플랫폼 → Web" 메뉴는 없어졌습니다.
+   > 이제 **키마다** 도메인을 붙이고, **REST API 키 카드에 등록하면 지도는
+   > 그대로 안 뜹니다.** 반드시 JavaScript 키 카드에 넣으세요.
+
+5. **제품 설정 → 카카오맵 → 사용 설정 ON** ← **가장 많이 빠뜨리는 단계**
+
+   > 도메인만 등록하고 이걸 안 켜면 `sdk.js` 가 **401** 로 거부되고,
+   > 화면에는 아무 설명 없이 지도만 안 뜹니다. 콘솔에만
+   > `[지도] SDK 를 불러오지 못했습니다` 가 찍힙니다.
+   >
+   > 카카오가 2026년에 이용 절차를 바꾸면서 생긴 단계입니다.
+   > → <https://developers.kakao.com/docs/ko/kakaomap/common>
+   >
+   > 첫 번째 앱은 무료 사용량이 붙습니다. 비즈월렛·결제수단은
+   > **두 번째 앱부터** 필요하므로 지금은 신경 쓰지 않아도 됩니다.
 
 ### ⚠️ 카카오 로그인은 지금 막혀 있습니다 (KOE205)
 
@@ -135,8 +152,8 @@ export const LOGIN_PROVIDER = "google";   // "github" | "kakao"
 아래 5~8번은 그때 하시면 됩니다.
 
 ### 카카오 로그인 (비즈앱 전환 후)
-5. **카카오 로그인 → 활성화 ON**
-6. **Redirect URI** 등록 — **가장 많이 틀리는 곳**
+6. **카카오 로그인 → 활성화 ON**
+7. **Redirect URI** 등록 — **가장 많이 틀리는 곳**
 
    ```
    https://iprdjwxcqwtqvksponlg.supabase.co/auth/v1/callback
@@ -145,17 +162,17 @@ export const LOGIN_PROVIDER = "google";   // "github" | "kakao"
    > ⚠️ **GitHub 주소가 아니라 Supabase 주소입니다.**
    > `<프로젝트ref>` 는 Supabase Project URL 안의 영문자 덩어리입니다.
 
-7. **보안 → Client Secret** 생성 → 코드 복사
-8. **동의항목 → 닉네임**만 필수 동의
+8. **보안 → Client Secret** 생성 → 코드 복사
+9. **동의항목 → 닉네임**만 필수 동의
    - **이메일은 건드리지 마세요.** 비즈앱 전환이 필요해지는데 우리는 이메일을 쓰지 않습니다.
 
 ---
 
 ## 3. 둘을 잇기
 
-9. Supabase → **Authentication → Providers → Kakao** 활성화
+10. Supabase → **Authentication → Providers → Kakao** 활성화
    - 카카오 **REST API 키** + **Client Secret** 붙여넣기
-10. Supabase → **Authentication → URL Configuration**
+11. Supabase → **Authentication → URL Configuration**
     - Site URL: `https://heehiii.github.io/gangneung505/app/`
     - Redirect URLs 에 추가:
       - `https://heehiii.github.io/gangneung505/app/**`
@@ -168,11 +185,20 @@ export const LOGIN_PROVIDER = "google";   // "github" | "kakao"
 
 ## 흔한 실수 세 가지
 
-| 틀리기 쉬운 것 | 맞는 것 |
-|---|---|
-| REST API 키를 지도에 | **JavaScript 키** |
-| Redirect URI 에 GitHub 주소 | **Supabase 콜백 주소** |
-| `service_role` 키를 config.js 에 | **`anon` 키** |
+| 틀리기 쉬운 것 | 맞는 것 | 증상 |
+|---|---|---|
+| 카카오맵 **사용 설정**을 안 켬 | 제품 설정 → 카카오맵 → ON | 지도만 조용히 안 뜸 (401) |
+| 도메인을 **REST API 키** 카드에 등록 | **JavaScript 키** 카드에 | 위와 똑같음 |
+| 도메인 입력만 하고 **저장**을 안 누름 | 맨 아래 저장 | 위와 똑같음 |
+| REST API 키를 `KAKAO_JS_KEY` 에 | **JavaScript 키** | 지도 안 뜸 |
+| Redirect URI 에 GitHub 주소 | **Supabase 콜백 주소** | KOE006 |
+| `service_role` 키를 config.js 에 | **`anon` / publishable 키** | 누구나 전체 삭제 가능 |
+| Client ID 복사할 때 **제목까지** 긁힘 | 값만 (`Ov23...`) | 로그인 화면이 404 |
+| Supabase provider 켜고 **Save** 안 누름 | Save 후 새로고침해 확인 | `provider is not enabled` |
+
+> 위 세 줄은 **증상이 전부 같습니다** — "지도만 안 뜸". 그래서 하나씩
+> 지워가며 확인해야 합니다. 콘솔(F12)에 `[지도] SDK 를 불러오지
+> 못했습니다` 가 찍히면 셋 중 하나입니다.
 
 ---
 
