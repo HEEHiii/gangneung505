@@ -131,6 +131,36 @@ export async function createRoom(form) {
   return { slug: r.slug, token: r.token, local: false };
 }
 
+/* ============================================================
+   비밀번호 화면에 띄울 최소 정보
+
+   친구가 링크를 열었을 때 "여행방"이라고만 뜨면 제대로 찾아온 건지
+   알 수가 없습니다. 이름·지역·날짜만 미리 보여줍니다.
+   숙소·투표·경비는 비밀번호 뒤에 그대로 있습니다.
+
+   못 가져와도 화면은 떠야 하므로 실패하면 null 입니다.
+   ============================================================ */
+export async function peekRoom(slug) {
+  if (!slug) return null;
+
+  if (!hasBackend()) {
+    const box = lread(slug);
+    if (!box) return null;
+    const r = box.room;
+    return {
+      title: r.title, region_name: r.region_name,
+      start_date: r.start_date, end_date: r.end_date,
+      people: r.people, theme: (r.settings || {}).theme || null,
+    };
+  }
+
+  try {
+    return await rpc("room_peek", { p_slug: slug });
+  } catch (_) {
+    return null;   // 있으면 좋은 것이라 실패해도 조용히
+  }
+}
+
 /* 내가 만든 방 목록 (로그인한 방장) */
 export async function listMyRooms() {
   if (!hasBackend()) return [];

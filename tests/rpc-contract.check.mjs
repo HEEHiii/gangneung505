@@ -18,13 +18,19 @@
      · GRANT 를 깜빡한 함수가 없는가  ← 이게 제일 조용한 실수입니다
    ============================================================ */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { RPC, NEEDS_LOGIN } from "../app/assets/supa.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const sql = readFileSync(join(ROOT, "supabase/migrations/0002_rpc.sql"), "utf8");
+
+/* 마이그레이션 전부를 읽습니다. 0002 만 읽으면 나중에 추가한 함수가
+   검사에서 빠져서, 계약이 어긋나도 조용히 통과합니다. */
+const MIG = join(ROOT, "supabase/migrations");
+const files = readdirSync(MIG).filter((f) => f.endsWith(".sql")).sort();
+const sql = files.map((f) => readFileSync(join(MIG, f), "utf8")).join("\n");
+console.log("── 읽은 마이그레이션\n  " + files.join(", ") + "\n");
 
 let fails = 0;
 const ok = (cond, what) => {

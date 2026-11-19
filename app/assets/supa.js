@@ -29,6 +29,9 @@ const SUPABASE_JS = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/
 export const RPC = {
   /* ---- 누구나 ---- */
   health:        [],
+  // 비밀번호 화면에 여행 이름을 띄우는 용도. 이름·지역·날짜만 돌려주고
+  // 숙소·투표·경비는 절대 포함하지 않습니다 (0003_room_peek.sql 주석 참고)
+  room_peek:     ["p_slug"],
   room_join:     ["p_slug", "p_password"],
   room_snapshot: ["p_token", "p_voter", "p_since"],
   place_add:     ["p_token", "p_voter", "p_data"],

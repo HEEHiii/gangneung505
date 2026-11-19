@@ -101,6 +101,28 @@ let roomUrl = "";
   eq(await page.locator("#gate").isVisible(), true, "비밀번호를 먼저 묻는다");
   eq(await page.locator("#app").isVisible(), false, "통과 전에는 내용이 안 보인다");
 
+  /* ★ 친구가 카톡으로 링크를 받아 열었을 때 "여기가 맞나?"를 알 수 있어야 합니다.
+     예전에는 "여행방"이라고만 떠서 확신이 안 섰습니다. */
+  eq(await page.locator("#gate-title").textContent(), "겨울 강릉",
+    "비밀번호 화면에 여행 이름이 뜬다");
+  const sub = await page.locator("#gate-sub").textContent();
+  ok(sub.includes("1박 2일"), `기간도 함께  (${sub.split("친구")[0].trim()})`);
+  ok(sub.includes("강릉"), "지역도 함께");
+  ok(sub.includes("4명"), "인원도 함께");
+  ok(sub.includes("비밀번호"), "무엇을 해야 하는지도 여전히 안내");
+  eq(await page.title(), "겨울 강릉 — 여행방", "브라우저 탭 제목도 바뀐다");
+
+  /* 1월 여행이므로 겨울 테마가 게이트부터 적용되어야 합니다 */
+  eq(await page.getAttribute("html", "data-theme"), "winter",
+    "게이트부터 계절 테마가 적용된다");
+
+  /* ★ 이름은 보여주되 내용은 비밀번호 뒤에 남아야 합니다.
+     서버가 정확히 무엇만 돌려주는지는 tests/sql/test.sql 의 5.5 절에서
+     항목 수까지 세어 확인합니다. 여기서는 화면에 안 그려지는지만 봅니다. */
+  eq(await page.locator("#lodging-list .card").count(), 0, "통과 전에는 숙소 카드가 없다");
+  eq(await page.locator("[data-vote]").count(), 0, "통과 전에는 투표 버튼이 없다");
+  eq(await page.locator(".map .pin-lodging").count(), 0, "통과 전에는 지도 핀도 없다");
+
   /* ★ 505 판은 화면에서 문자열을 비교해서 F12 로 그냥 보였습니다.
      이제 비밀번호가 페이지 소스 어디에도 없어야 합니다. */
   const html = await page.content();
@@ -137,6 +159,12 @@ let roomUrl = "";
 
   await page.goto(`${BASE}/app/room.html?r=ZZZZZZZZZ`);
   await page.waitForFunction(() => window.__roomReady === true, { timeout: 8000 });
+
+  /* 없는 방은 이름을 못 가져오니 기본 문구 그대로여야 합니다 (화면이 멈추면 안 됩니다) */
+  eq(await page.locator("#gate-title").textContent(), "여행방",
+    "없는 방은 기본 제목 그대로");
+  eq(await page.locator("#gate-form").isVisible(), true, "그래도 입력칸은 떠 있다");
+
   await page.fill("#gate-input", "0505");
   await page.click("#gate-go");
   await page.waitForTimeout(400);

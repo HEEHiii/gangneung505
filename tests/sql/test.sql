@@ -292,6 +292,55 @@ select pg_temp.ok((select length(v) < 120 from t where k = 'snap2'), '변경 없
 -- ============================================================
 --  6. 방 격리 — A 토큰으로 B 방을 못 건드린다
 -- ============================================================
+\echo '── 5.5 게이트 정보 (room_peek)'
+set role anon;
+
+insert into t select 'peek', (public.room_peek((select v from t where k = 'slug1')))::text;
+
+select pg_temp.ok((select v::jsonb ->> 'title' from t where k = 'peek') = '겨울 강릉', '여행 이름이 보인다');
+select pg_temp.ok((select v::jsonb ->> 'region_name' from t where k = 'peek') = '강릉', '지역이 보인다');
+select pg_temp.ok((select v::jsonb ->> 'start_date' from t where k = 'peek') = '2027-01-23', '날짜가 보인다');
+select pg_temp.ok((select (v::jsonb ->> 'people')::int from t where k = 'peek') = 4, '인원이 보인다');
+select pg_temp.ok((select v::jsonb ->> 'theme' from t where k = 'peek') = 'winter', '테마가 보인다 (게이트부터 계절 적용)');
+
+/* ★ 여기부터가 핵심입니다 — 내용은 비밀번호 뒤에 남아야 합니다.
+   이 경계가 무너지면 링크만 퍼져도 방이 다 열립니다. */
+select pg_temp.ok((select position('오붓한강릉' in v) = 0 from t where k = 'peek'), '숙소 이름이 새지 않는다');
+select pg_temp.ok((select position('$2'   in v) = 0 from t where k = 'peek'), '비밀번호 해시가 새지 않는다');
+select pg_temp.ok((select position('places' in v) = 0 from t where k = 'peek'), '장소 목록이 없다');
+select pg_temp.ok((select position('counts' in v) = 0 from t where k = 'peek'), '투표 집계가 없다');
+select pg_temp.ok((select position('voter'  in v) = 0 from t where k = 'peek'), '투표자 정보가 없다');
+select pg_temp.ok((select position('hub'    in v) = 0 from t where k = 'peek'), '출발 지점 좌표도 없다');
+select pg_temp.ok(
+  (select count(*) from jsonb_object_keys((select v::jsonb from t where k = 'peek'))) = 6,
+  '돌려주는 항목이 정확히 6개 (이름·지역·시작·종료·인원·테마)');
+
+-- 없는 방과 이상한 주소는 조용히 null
+select pg_temp.ok(public.room_peek('ZZZZZZZZZ') is null, '없는 방은 null');
+select pg_temp.ok(public.room_peek('짧음')      is null, '모양이 안 맞는 주소는 조회조차 안 함');
+select pg_temp.ok(public.room_peek('')          is null, '빈 문자열은 null');
+select pg_temp.ok(public.room_peek(null)        is null, 'null 입력은 null');
+select pg_temp.ok(public.room_peek('AEIOUAEIO') is null, '알파벳 밖 글자(모음)는 null');
+
+-- 손으로 소문자로 쳐도 찾아줍니다
+select pg_temp.ok(
+  (public.room_peek(lower((select v from t where k = 'slug1'))) ->> 'title') = '겨울 강릉',
+  '소문자로 쳐도 찾아준다');
+
+/* ★ 링크만 아는 사람이 방을 영원히 살려두면 안 됩니다.
+   peek 이 last_seen_at 을 갱신하면 오래된 방 정리가 무력해집니다. */
+reset role;
+insert into t select 'seen_before',
+  (select last_seen_at from app.rooms where slug = (select v from t where k = 'slug1'))::text;
+set role anon;
+select public.room_peek((select v from t where k = 'slug1'));
+reset role;
+select pg_temp.ok(
+  (select last_seen_at from app.rooms where slug = (select v from t where k = 'slug1'))::text
+    = (select v from t where k = 'seen_before'),
+  'peek 전후로 last_seen_at 이 같다 (링크만으로 방을 살려둘 수 없음)');
+
+
 \echo '── 6. 방 격리'
 set role authenticated;
 select set_config('request.jwt.claims',

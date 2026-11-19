@@ -18,7 +18,7 @@ import { KAKAO_JS_KEY, hasBackend, hasMap } from "./config.js";
 import { regionByCode, THEMES } from "./regions.js";
 import { loadKakao, kakaoReady, createMap } from "./kakaomap.js";
 import { searchByKeyword, seedSpots, resolveLink } from "./places.js";
-import { createStore, resumeRoom, setRoomPassword, deleteRoom } from "./store.js";
+import { createStore, peekRoom, resumeRoom, setRoomPassword, deleteRoom } from "./store.js";
 import { currentUser } from "./auth.js";
 import { slugFromUrl, getToken, setToken, clearToken, rememberRoom } from "./session.js";
 
@@ -77,6 +77,34 @@ async function tryEnter(password) {
     return false;
   } finally {
     btn.disabled = false;
+  }
+}
+
+/* 비밀번호를 넣기 전에 "여기가 맞나?"를 알려줍니다.
+
+   친구가 카톡으로 링크를 받아 열면 "여행방"이라고만 떠서 제대로
+   찾아온 건지 알 수가 없었습니다. 이름·날짜·지역만 미리 보여주고,
+   숙소·투표·경비는 그대로 비밀번호 뒤에 둡니다.
+
+   못 가져오면 기본 문구를 그대로 둡니다 — 화면이 멈추면 안 됩니다. */
+function applyPeek(info) {
+  if (!info || !info.title) return;
+
+  document.title = `${info.title} — 여행방`;
+  $("#gate-title").textContent = info.title;
+
+  const bits = [];
+  if (info.start_date && info.end_date) bits.push(fmtRange(info.start_date, info.end_date));
+  if (info.region_name) bits.push(info.region_name);
+  if (info.people) bits.push(`${info.people}명`);
+
+  $("#gate-sub").innerHTML =
+    (bits.length ? `<span class="gate-meta">${esc(bits.join(" · "))}</span>` : "") +
+    "친구에게 받은 비밀번호를 넣어주세요.";
+
+  // 방을 만들 때 고른 계절을 게이트부터 적용합니다
+  if (info.theme && THEMES.some((t) => t.key === info.theme)) {
+    document.documentElement.setAttribute("data-theme", info.theme);
   }
 }
 
@@ -762,6 +790,10 @@ async function boot() {
 
   store = createStore(slug);
 
+  // 게이트에 띄울 정보를 미리 불러둡니다. 아래 경로로 바로 들어가면
+  // 쓰이지 않고 버려지므로, 기다리지 않고 먼저 띄워만 둡니다.
+  const peeking = peekRoom(slug);
+
   // 이미 들어와 본 적이 있으면 바로 (친구들은 몇 주에 걸쳐 다시 엽니다)
   const saved = getToken(slug);
   if (saved) {
@@ -786,6 +818,8 @@ async function boot() {
     } catch (_) { /* 내 방이 아니면 그냥 비밀번호를 묻습니다 */ }
   }
 
+  // 여기까지 왔으면 비밀번호를 물어봐야 합니다
+  applyPeek(await peeking);
   $("#gate-input").focus();
   window.__roomReady = true;   // 게이트가 떴다는 뜻 (테스트용)
 }

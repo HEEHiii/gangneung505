@@ -51,15 +51,18 @@ run() { $AS_PG "$PSQL -d trip -v ON_ERROR_STOP=1 -q -f $WORK/sql/$1"; }
 echo "── Supabase 뼈대 (auth 스키마, anon/authenticated 역할)"
 run prelude.sql
 
-echo "── 0001_schema.sql"
-run 0001_schema.sql
+# ★ 파일 이름을 박아두지 않습니다.
+#   마이그레이션을 새로 추가했는데 여기 안 적으면, 테스트는 그 함수가
+#   없는 DB 에서 돌면서도 통과해버립니다 (실제로 0003 에서 겪었습니다).
+MIGRATIONS=$(cd "$ROOT/supabase/migrations" && ls *.sql | sort)
 
-echo "── 0002_rpc.sql"
-run 0002_rpc.sql
+for m in $MIGRATIONS; do
+  echo "── $m"
+  run "$m"
+done
 
 echo "── 다시 실행해도 안전한지 (여러 번 붙여넣는 경우)"
-run 0001_schema.sql
-run 0002_rpc.sql
+for m in $MIGRATIONS; do run "$m"; done
 
 echo "── 기능 테스트"
 $AS_PG "$PSQL -d trip -v ON_ERROR_STOP=1 -f $WORK/sql/test.sql"
