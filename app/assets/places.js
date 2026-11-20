@@ -41,6 +41,12 @@ function places() {
   return new K.Places();
 }
 
+function geocoder() {
+  const K = window.kakao && window.kakao.maps && window.kakao.maps.services;
+  if (!K || !K.Geocoder) return null;
+  return new K.Geocoder();
+}
+
 function kakaoBounds(bbox) {
   const K = window.kakao && window.kakao.maps;
   if (!K || !bbox) return null;
@@ -144,6 +150,55 @@ export async function seedSpots(region, limit = 12) {
   });
   return got.slice(0, limit).map((s) => ({ ...s, kind: "spot", seeded: true }));
 }
+
+/* ============================================================
+   주소로 찾기
+
+   ★ 왜 따로 필요한가
+
+   네이버 숙소 페이지나 에어비앤비 링크에는 좌표가 없습니다. 브라우저는
+   남의 사이트 페이지를 읽을 수 없으니(CORS) 링크만으로는 위치를 알 수가
+   없습니다. 그런데 그 페이지에 적힌 "주소 한 줄"은 사용자가 복사할 수
+   있습니다. 그걸 받아서 좌표로 바꿔주면, 서버 없이도 지도에 뜹니다.
+
+   이름 검색(keywordSearch)과는 다른 API 입니다. "강원특별자치도 강릉시
+   사천면 가둔지길 24" 같은 도로명 주소는 이름 검색으로는 잘 안 나옵니다.
+   ============================================================ */
+export function looksLikeAddress(v) {
+  const t = String(v || "").trim();
+  if (t.length < 6) return false;
+  /* 도로명(…로/…길 + 번호) 또는 지번(…동/…리 + 번지) 꼴 */
+  return /(로|길)\s*\d/.test(t) || /(동|리|가)\s*\d+(-\d+)?\s*$/.test(t)
+      || /(특별자치도|광역시|특별시|[가-힣]+시|[가-힣]+군|[가-힣]+구)\s/.test(t);
+}
+
+export function searchByAddress(addr, opts = {}) {
+  const { kind = null } = opts;
+  return new Promise((resolve) => {
+    const geo = geocoder();
+    if (!geo) return resolve([]);
+    geo.addressSearch(String(addr || "").trim(), (res, status) => {
+      if (status !== window.kakao.maps.services.Status.OK || !Array.isArray(res)) {
+        return resolve([]);
+      }
+      const out = [];
+      for (const r of res) {
+        const lat = parseFloat(r.y), lng = parseFloat(r.x);
+        if (!inKorea(lat, lng)) continue;
+        out.push({
+          name: r.road_address ? r.road_address.building_name || "" : "",
+          lat, lng,
+          address: (r.road_address && r.road_address.address_name)
+                || (r.address && r.address.address_name) || String(addr),
+          url: "", kind: kind || "spot", kakao_place_id: null,
+          source: "address",
+        });
+      }
+      resolve(out);
+    });
+  });
+}
+
 
 /* 지역의 출발·귀가 지점 (regions.js 의 hubQuery 로 찾습니다)
    좌표를 손으로 적지 않는 이유: 역이 이전해도 저절로 맞고,

@@ -17,7 +17,8 @@ import { distanceKm, prettyKm, parsePos } from "./geo.js";
 import { KAKAO_JS_KEY, hasBackend, hasMap } from "./config.js";
 import { regionByCode, THEMES } from "./regions.js";
 import { loadKakao, kakaoReady, createMap } from "./kakaomap.js";
-import { searchByKeyword, seedSpots, resolveLink, findHub } from "./places.js";
+import { searchByKeyword, searchByAddress, looksLikeAddress,
+         seedSpots, resolveLink, findHub } from "./places.js";
 import { createStore, peekRoom, resumeRoom, setRoomPassword, deleteRoom } from "./store.js";
 import { currentUser } from "./auth.js";
 import { settle } from "./settle.js";
@@ -566,17 +567,30 @@ function makeAdder({ slot, kind, mapKey, label }) {
         <label class="field">
           <span class="field-label">이름이나 링크</span>
           <div class="search-row">
-            <input class="a-q" placeholder="예: 초당순두부  ·  또는 지도 링크 붙여넣기">
+            <input class="a-q" placeholder="예: 초당순두부  ·  강릉시 가둔지길 24  ·  지도 링크">
             <button type="button" class="a-find">찾기</button>
           </div>
         </label>
-        <p class="field-note a-status">이름을 치거나, 지도 앱에서 복사한 링크를 붙여넣으세요.</p>
+        <p class="field-note a-status">이름 · 주소 · 지도 링크 아무거나 됩니다.</p>
         <ul class="pick-list a-hits" hidden></ul>
 
         <label class="field">
           <span class="field-label">메모 <span class="opt">(선택)</span></span>
           <input class="a-note" maxlength="60" placeholder="예: 웨이팅 길어요">
         </label>
+
+        <label class="field">
+          <span class="field-label">${kind === "lodging" ? "예약" : "보러갈"} 링크 <span class="opt">(선택)</span></span>
+          <input class="a-url" type="url" inputmode="url"
+                 placeholder="${kind === "lodging"
+                   ? "네이버·에어비앤비 예약 페이지 주소"
+                   : "보여주고 싶은 페이지 주소"}">
+        </label>
+        <p class="field-note">
+          ${kind === "lodging"
+            ? "넣어두면 카드의 <strong>보러가기</strong>가 바로 예약 페이지로 갑니다."
+            : "넣어두면 카드의 <strong>보러가기</strong>가 이 주소로 갑니다."}
+        </p>
 
         ${kind === "food" ? `
         <label class="field">
@@ -599,6 +613,7 @@ function makeAdder({ slot, kind, mapKey, label }) {
   const status = root.querySelector(".a-status");
   const hits = root.querySelector(".a-hits");
   const noteIn = root.querySelector(".a-note");
+  const urlIn = root.querySelector(".a-url");
   const kindIn = root.querySelector(".a-kind");
 
   const say = (msg, bad = false) => {
@@ -624,14 +639,27 @@ function makeAdder({ slot, kind, mapKey, label }) {
 
   async function add(place) {
     try {
+      /* ★ 사용자가 적은 링크가 이깁니다.
+
+         이름으로 검색해서 추가하면 카카오가 준 place_url 이 붙습니다.
+         위치는 정확하지만 "보러가기"가 카카오맵으로 가서, 숙소를
+         바로 예약할 수가 없습니다. 그래서 예약 링크를 따로 받아
+         그게 있으면 그걸 씁니다. 위치는 카카오로 정확히, 링크는
+         사용자가 원하는 곳으로. */
+      const myUrl = urlIn.value.trim();
+      if (myUrl && !/^https?:\/\//i.test(myUrl)) {
+        return say("링크는 https:// 로 시작해야 해요", true);
+      }
+
       await store.placeAdd({
         ...place,
+        url: myUrl || place.url || null,
         kind: finalKind(place),
         note: noteIn.value.trim() || null,
       });
       await refresh(true);
       redrawAll();
-      q.value = ""; noteIn.value = "";
+      q.value = ""; noteIn.value = ""; urlIn.value = "";
       hits.hidden = true;
       say("추가했어요. 계속 넣어도 됩니다.");
       toast(`${label}을 추가했어요`);
@@ -684,9 +712,35 @@ function makeAdder({ slot, kind, mapKey, label }) {
       if (!kakaoReady()) {
         return say("지도 키가 없어서 이름 검색은 아직 안 돼요. 링크를 붙여넣거나 지도에서 찍어주세요.", true);
       }
+      /* ★ 주소도 받습니다.
+
+         네이버 숙소 페이지나 에어비앤비 링크에는 좌표가 없고,
+         브라우저는 남의 사이트를 읽을 수 없습니다(CORS). 하지만
+         그 페이지에 적힌 주소 한 줄은 사용자가 복사할 수 있습니다.
+         그걸 좌표로 바꿔주면 서버 없이도 지도에 뜹니다.
+
+         도로명 주소는 이름 검색으로는 잘 안 나오므로, 주소처럼
+         보이면 주소 검색을 먼저 시도합니다. */
+      if (looksLikeAddress(v)) {
+        const byAddr = await searchByAddress(v, { kind: pickedKind() });
+        if (byAddr.length) {
+          return showHits(
+            byAddr.map((h) => ({ ...h, name: h.name || v })),
+            "주소로 찾았어요. 맞으면 골라주세요."
+          );
+        }
+      }
+
       const list = await searchByKeyword(v, { bbox: regionBbox(), size: 8, kind: pickedKind() });
-      if (!list.length) return say("못 찾았어요. 다른 이름으로 찾아보거나 지도에서 찍어주세요.", true);
-      showHits(list, "맞는 곳을 골라주세요.");
+      if (list.length) return showHits(list, "맞는 곳을 골라주세요.");
+
+      /* 이름으로도 못 찾았으면 마지막으로 주소로 한 번 더 */
+      const byAddr2 = await searchByAddress(v, { kind: pickedKind() });
+      if (byAddr2.length) {
+        return showHits(byAddr2.map((h) => ({ ...h, name: h.name || v })),
+                        "주소로 찾았어요. 맞으면 골라주세요.");
+      }
+      return say("못 찾았어요. 주소를 붙여넣거나 지도에서 찍어주세요.", true);
     } catch (e) {
       say(e.message || "찾지 못했어요", true);
     }

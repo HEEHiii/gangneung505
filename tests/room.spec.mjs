@@ -789,6 +789,88 @@ console.log("── 맛집 카드 → 지도 이동");
   await ctx.close();
 }
 
+
+/* ============================================================
+   주소로 추가 + 예약 링크
+
+   ★ 사장님이 실제로 겪은 문제:
+     이름으로 검색해 숙소를 추가하면 카카오가 준 링크가 붙어서
+     "보러가기"가 카카오맵으로 갑니다. 위치는 정확하지만 예약을
+     할 수가 없습니다. 그리고 네이버·에어비앤비 링크에는 좌표가
+     없어서(브라우저는 남의 사이트를 못 읽습니다) 지도에 안 뜹니다.
+   ============================================================ */
+console.log("── 주소로 추가 · 예약 링크");
+{
+  const ADDR = "강원특별자치도 강릉시 사천면 가둔지길 24";
+  const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
+  await stubConfig(ctx, { KAKAO_JS_KEY: "0".repeat(32) });
+  await ctx.addInitScript({ content: STUB });
+  await ctx.addInitScript({ content: `window.__stubPlaces = ${JSON.stringify({
+    address: {
+      [ADDR]: [{
+        x: "128.8780", y: "37.8250",
+        road_address: { address_name: ADDR, building_name: "오붓한강릉" },
+        address: { address_name: "강릉시 사천면 가둔지리 123" },
+      }],
+    },
+  })};` });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+
+  await openRoom(page, await makeRoom(page, { title: "주소 추가" }));
+  await enter(page);
+
+  await page.click("#adder-stay summary");
+  await page.fill("#adder-stay .a-q", ADDR);
+  await page.fill("#adder-stay .a-url", "https://www.airbnb.co.kr/rooms/12345678");
+  await page.click("#adder-stay .a-find");
+  await page.waitForTimeout(600);
+
+  ok((await page.locator("#adder-stay .a-status").textContent()).includes("주소로 찾았어요"),
+    "도로명 주소로 찾아준다");
+  eq(await page.locator("#adder-stay .a-hits li").count(), 1, "후보가 하나 나온다");
+
+  await page.locator("#adder-stay .a-hits button").first().click();
+  await page.waitForTimeout(700);
+
+  eq(await page.locator("#lodging-list .card").count(), 1, "주소만으로 숙소가 추가된다");
+  const link = await page.locator("#lodging-list .card .btn-link").first().getAttribute("href");
+  eq(link, "https://www.airbnb.co.kr/rooms/12345678",
+    "★ 보러가기가 내가 적은 예약 링크로 간다 (카카오맵이 아니라)");
+
+  /* 좌표가 제대로 들어갔는지 — 지도에 떠야 의미가 있습니다 */
+  await page.locator("#lodging-list .card .card-name").first().click();
+  await page.waitForTimeout(400);
+  const c = await page.evaluate(() => {
+    const m = window.__kmaps && window.__kmaps["map-stay"];
+    return m ? m.__center().map((v) => v.toFixed(4)).join(",") : "없음";
+  });
+  eq(c, "37.8250,128.8780", "주소가 좌표로 바뀌어 지도에 뜬다");
+
+  /* 링크를 안 적으면 예전처럼 동작 */
+  await page.fill("#adder-stay .a-q", ADDR);
+  await page.click("#adder-stay .a-find");
+  await page.waitForTimeout(600);
+  await page.locator("#adder-stay .a-hits button").first().click();
+  await page.waitForTimeout(700);
+  eq(await page.locator("#lodging-list .card").count(), 2, "링크 없이도 추가된다");
+
+  /* 이상한 링크는 막는다 */
+  await page.fill("#adder-stay .a-q", ADDR);
+  await page.fill("#adder-stay .a-url", "그냥 글자");
+  await page.click("#adder-stay .a-find");
+  await page.waitForTimeout(600);
+  await page.locator("#adder-stay .a-hits button").first().click();
+  await page.waitForTimeout(500);
+  ok((await page.locator("#adder-stay .a-status").textContent()).includes("https://"),
+    "링크 모양이 아니면 알려준다");
+  eq(await page.locator("#lodging-list .card").count(), 2, "그때는 추가되지 않는다");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");
