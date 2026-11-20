@@ -114,6 +114,8 @@ for (const scheme of ["light", "dark"]) {
   }
 
   eq(seen.size, 4, `${scheme}: 계절 4개가 서로 다른 배경색`);
+  /* 이 루프는 두 기기 설정에서 각각 도는데, 아래 묶음이
+     "두 번 다 같은 값이 나오는지"를 따로 확인합니다 */
   eq(errors.length, 0, `${scheme}: 콘솔 오류 없음`);
   await ctx.close();
 }
@@ -167,14 +169,18 @@ console.log("── 테마 적용");
 }
 
 /* ============================================================
-   겨울은 기기 설정과 무관하게 항상 어둡다
+   네 계절 모두 기기 설정과 무관하게 같은 모습
 
-   ★ 계절이 색뿐 아니라 분위기까지 정하게 한 선택입니다.
-     나머지 세 계절은 기기 설정을 따라가므로, 이 둘이 섞이지 않는지
-     확인해야 합니다. 겨울이 밝아지거나, 다른 계절이 기기를 무시하면
-     "고를 때 본 색과 실제 화면이 다르다"가 됩니다.
+   ★ 여행방은 여럿이 같이 보는 화면입니다.
+     예전에는 밝게/어둡게를 기기 설정이 정했는데, 카톡 인앱
+     브라우저가 어두운 모드를 보고하지 않아서 같은 폰에서도
+     카톡으로 열면 밝고 사파리로 열면 어두웠습니다. 친구마다
+     전혀 다른 화면을 보게 됩니다.
+
+     그래서 계절이 밝기까지 정합니다 — 봄·여름·가을은 늘 밝고
+     겨울은 늘 어둡습니다. 이 테스트가 그걸 고정합니다.
    ============================================================ */
-console.log("── 겨울은 항상 어둡게");
+console.log("── 기기 설정과 무관하게 같은 화면");
 {
   const read = async (scheme, theme) => {
     const ctx = await browser.newContext({ colorScheme: scheme });
@@ -193,21 +199,33 @@ console.log("── 겨울은 항상 어둡게");
     return r;
   };
 
-  const wL = await read("light", "winter");
+  /* ★ 핵심: 어떤 계절이든 밝은 기기와 어두운 기기에서 똑같아야 합니다.
+     하나라도 달라지면 카톡으로 연 친구와 사파리로 연 친구가
+     다른 화면을 보게 됩니다. */
+  for (const season of SEASONS) {
+    const a = await read("light", season);
+    const b = await read("dark", season);
+    eq(a.bg, b.bg, `${season} — 기기 설정이 달라도 배경이 같다`);
+    eq(a.text, b.text, `${season} — 기기 설정이 달라도 글자색이 같다`);
+  }
+
+  /* 봄·여름·가을은 밝고, 겨울은 어둡다 */
+  for (const season of ["spring", "summer", "autumn"]) {
+    const r = await read("dark", season);
+    ok(lum(parseRgb(r.bg)) > 0.7,
+      `${season} 은 어두운 기기에서도 밝다  (${r.bg})`);
+  }
   const wD = await read("dark", "winter");
-  eq(wL.bg, wD.bg, "겨울 배경이 기기 설정과 무관하게 같다");
+  const wL = await read("light", "winter");
   ok(lum(parseRgb(wL.bg)) < 0.1, `겨울은 밝은 기기에서도 어둡다  (${wL.bg})`);
   ok(contrast(wL.text, wL.bg) >= 4.5,
     `겨울(밝은 기기) 본문 대비 ${contrast(wL.text, wL.bg).toFixed(2)}:1`);
 
-  /* 나머지 셋은 기기 설정을 그대로 따라가야 합니다 */
-  for (const s of ["spring", "summer", "autumn"]) {
-    const a = await read("light", s);
-    const b = await read("dark", s);
-    ok(a.bg !== b.bg, `${s} 은 기기 설정을 따라간다`);
-    ok(lum(parseRgb(a.bg)) > 0.7, `${s} 은 밝은 기기에서 밝다`);
-    ok(lum(parseRgb(b.bg)) < 0.1, `${s} 은 어두운 기기에서 어둡다`);
-  }
+  /* CSS 에 기기 설정을 보는 규칙이 아예 없어야 합니다 —
+     하나라도 남아 있으면 그 계절만 조용히 둘로 갈라집니다 */
+  const cssSrc = readFileSync(join(HERE, "..", "app", "assets", "style.css"), "utf8");
+  const mediaRules = cssSrc.match(/@media[^{]*prefers-color-scheme[^{]*\{/g) || [];
+  eq(mediaRules.length, 0, "CSS 에 prefers-color-scheme 규칙이 없다");
 
   /* 고를 때 보이는 색 견본도 어두워야 합니다 — 아니면 고른 것과 다른 게 나옵니다 */
   const css = readFileSync(join(HERE, "..", "app", "assets", "style.css"), "utf8");

@@ -9,9 +9,9 @@
      다크 테마에서 어둡게 바꾸면 밝은 지도 위에서 핀이 사라집니다.
      그래서 --pin-ring / --pin-fill 은 고정입니다.
 
-   ★ 다크 모드는 덤으로 따라옵니다.
-     계절 네 개 × (밝게/어둡게) 여덟 벌이고, 어두운 쪽은
-     prefers-color-scheme 를 따릅니다.
+   ★ 계절이 밝기까지 정합니다.
+     봄·여름·가을은 늘 밝고 겨울은 늘 어둡습니다. 기기의 다크 모드
+     설정을 따르지 않습니다 — 아래 "왜 안 따르는가" 참고.
    ============================================================ */
 /* 제목은 손글씨(개구), 본문은 부드러운 고딕(고운돋움).
    여행 수첩 느낌을 내면서 본문은 읽기 편해야 하므로 둘을 나눴습니다. */
@@ -87,36 +87,20 @@
   --danger:#ff9a8b; --ok:#7fd9ab;
 }
 
-/* ───────── 어두울 때 ─────────
-   어두운 쪽도 색을 눕혀서(채도를 낮춰) 파스텔 느낌을 이어갑니다. */
-@media (prefers-color-scheme: dark){
-  :root,
-  :root[data-theme="summer"]{
-    color-scheme:dark;
-    --bg:#141d23; --surface:#1b262e; --surface-2:#223039;
-    --line:#2c3b45; --line-strong:#415360;
-    --text:#e4eef3; --muted:#9db2bf; --faint:#5f7079;
-    --accent:#86c8de; --accent-soft:#1e3540; --on-dark:#141d23;
-    --danger:#ff9a8b; --ok:#7fd9ab;
-  }
-  :root[data-theme="spring"]{
-    color-scheme:dark;
-    --bg:#1e1619; --surface:#271d21; --surface-2:#302429;
-    --line:#3a2d32; --line-strong:#503f45;
-    --text:#f4e8ec; --muted:#bda3ab; --faint:#776168;
-    --accent:#f0a9ba; --accent-soft:#3b2930; --on-dark:#1e1619;
-    --danger:#ff9a8b; --ok:#7fd9ab;
-  }
-  :root[data-theme="autumn"]{
-    color-scheme:dark;
-    --bg:#1e1812; --surface:#271f17; --surface-2:#30271d;
-    --line:#3a3025; --line-strong:#504234;
-    --text:#f5ece0; --muted:#bfad97; --faint:#7a6a57;
-    --accent:#eeab73; --accent-soft:#3b2c1d; --on-dark:#1e1812;
-    --danger:#ff9a8b; --ok:#7fd9ab;
-  }
-  /* 겨울은 위에서 이미 어둡게 정의했으므로 여기 없습니다 */
-}
+/* ───────── 왜 기기 설정(prefers-color-scheme)을 안 따르는가 ─────────
+
+   예전에는 밝게/어둡게를 기기 설정이 정하고 계절은 색만 정했습니다.
+   그런데 같은 방을 친구들이 서로 다른 브라우저로 열면 화면이 전혀
+   달라 보였습니다. 카톡 인앱 브라우저는 어두운 모드를 보고하지
+   않아서, 같은 폰에서도 카톡으로 열면 밝고 사파리로 열면 어두웠습니다.
+
+   여행방은 여럿이 같이 보는 화면입니다. "내 폰에서 어떻게 보이나"
+   보다 "친구들이 다 같은 걸 보나"가 중요합니다.
+
+   그래서 계절이 분위기까지 정합니다 — 봄·여름·가을은 늘 밝고,
+   겨울은 늘 어둡습니다. 어두운 화면을 원하면 겨울을 고르면 됩니다.
+   tests/theme.spec.mjs 가 네 계절 모두 기기 설정과 무관한지 잽니다.
+   ───────────────────────────────────────────────────────── */
 
 *,*::before,*::after{box-sizing:border-box}
 
