@@ -551,7 +551,13 @@ export function createStore(slug) {
           body: JSON.stringify({ token, url }),
           signal: AbortSignal.timeout(8000),
         });
-        if (res.status === 404 || res.status === 501) { resolveOff = true; return null; }
+        /* 404(배포 안 됨) · 401(JWT 검사에 막힘) 처럼 "설정 문제"는
+           다시 시도해도 똑같습니다. 한 번 겪으면 그만둡니다.
+           403(토큰·횟수) 은 상황이 바뀔 수 있으므로 계속 시도합니다. */
+        if (res.status === 404 || res.status === 401 || res.status >= 500) {
+          resolveOff = true;
+          return null;
+        }
         const got = await res.json();
         if (got && got.ok) return { lat: got.lat, lng: got.lng, name: got.name || "" };
         return null;
