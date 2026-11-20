@@ -29,7 +29,24 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
    검사에서 빠져서, 계약이 어긋나도 조용히 통과합니다. */
 const MIG = join(ROOT, "supabase/migrations");
 const files = readdirSync(MIG).filter((f) => f.endsWith(".sql")).sort();
-const sql = files.map((f) => readFileSync(join(MIG, f), "utf8")).join("\n");
+const rawSql = files.map((f) => readFileSync(join(MIG, f), "utf8")).join("\n");
+
+/* ★ 줄 끝 주석(-- …)을 먼저 걷어냅니다.
+   서명 옆에 "p_days jsonb  -- [{day_index, ...}]" 처럼 설명을 달면
+   파서가 그 안의 단어를 인자 이름으로 착각합니다. 실제로 그랬습니다.
+   문자열 안의 -- 까지 지우지 않도록 따옴표 밖에서만 자릅니다. */
+const stripComments = (src) => src.split("\n").map((line) => {
+  let q = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) { if (c === q) q = null; continue; }
+    if (c === "'" || c === '"') { q = c; continue; }
+    if (c === "-" && line[i + 1] === "-") return line.slice(0, i);
+  }
+  return line;
+}).join("\n");
+
+const sql = stripComments(rawSql);
 console.log("── 읽은 마이그레이션\n  " + files.join(", ") + "\n");
 
 let fails = 0;
@@ -159,7 +176,7 @@ for (const n of Object.keys(grants)) {
    ============================================================ */
 console.log("── 스냅샷 키");
 const EXPECTED_SNAPSHOT_KEYS =
-  ["counts", "expenses", "mine", "places", "room", "unchanged", "updated_at"];
+  ["counts", "expenses", "itinerary", "mine", "places", "room", "unchanged", "updated_at"];
 
 {
   /* room_snapshot 본문에서 최상위 jsonb_build_object 의 키만 뽑습니다.

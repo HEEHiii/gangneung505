@@ -393,7 +393,7 @@ let roomUrl = "";
   /* 2단계 탭 */
   await page.click('#tabs a[data-tab="plan"]');
   await page.waitForTimeout(300);
-  ok((await page.locator("#panel-plan").textContent()).includes("곧 열립니다"), "일정 탭 안내");
+  ok(await page.locator("#plan-build").isVisible(), "일정 탭에 '짜기' 버튼이 보임");
   await page.click('#tabs a[data-tab="money"]');
   await page.waitForTimeout(300);
   ok(await page.locator("#ex-form").isVisible(), "정산 탭에 지출 적는 칸이 열림");
@@ -545,6 +545,111 @@ console.log("── 정산 탭");
     "내가 적은 것에는 지우기 버튼이 있다");
 
   await a.ctx.close();
+}
+
+
+/* ============================================================
+   일정 탭
+
+   ★ 투표 → 일정 생성 → 직접 수정 → 새로고침해도 남아있는지.
+     짜는 알고리즘 자체는 tests/route.check.mjs 가 따로 확인합니다.
+   ============================================================ */
+console.log("── 일정 탭");
+{
+  const { ctx, page, errors } = await fresh();
+  await openRoom(page, await makeRoom(page, {
+    title: "일정 시험", start: "2027-01-23", end: "2027-01-25", people: 4,
+  }));
+  await enter(page);
+
+  await page.click('#tabs a[data-tab="plan"]');
+  await page.waitForSelector("#panel-plan:not([hidden])", { timeout: 5000 });
+  eq(await page.locator("#plan-empty").isVisible(), true, "처음에는 '아직 일정이 없어요'");
+  eq(await page.locator("#plan-share").isVisible(), false, "일정이 없으면 공유 버튼도 숨음");
+
+  /* 장소가 없으면 안내 */
+  await page.click("#plan-build");
+  await page.waitForTimeout(300);
+  ok((await page.locator("#plan-error").textContent()).includes("추가"),
+    "장소가 없으면 먼저 추가하라고 알려줌");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
+
+{
+  console.log("── 일정 — 짜고 고치기");
+  const { ctx, page, errors } = await fresh();
+  await openRoom(page, await makeRoom(page, {
+    title: "일정 전체", start: "2027-01-23", end: "2027-01-25", people: 4,
+  }));
+  await enter(page);
+
+  /* 지도 없이 카카오 링크로 장소를 넣습니다 (좌표가 링크 안에 있습니다) */
+  const addVia = async (tab, name, lat, lng) => {
+    await page.click(`#tabs a[data-tab="${tab}"]`);
+    await page.waitForTimeout(200);
+    const box = `#adder-${tab}`;
+    /* 추가가 끝나면 접히므로, 눈에 보이는지로 판단해 다시 엽니다 */
+    if (!(await page.locator(`${box} .a-q`).isVisible())) {
+      await page.click(`${box} summary`);
+      await page.locator(`${box} .a-q`).waitFor({ state: "visible", timeout: 5000 });
+    }
+    await page.fill(`${box} .a-q`, `https://map.kakao.com/link/map/${name},${lat},${lng}`);
+    await page.click(`${box} .a-find`);
+    await page.waitForTimeout(700);
+  };
+
+  await addVia("stay", "오붓한강릉", 37.8250, 128.8780);
+  await addVia("food", "초당순두부", 37.7956, 128.9142);
+  await addVia("food", "경포대", 37.7955, 128.8963);
+  await addVia("food", "주문진회센터", 37.8960, 128.8295);
+
+  await page.click('#tabs a[data-tab="plan"]');
+  await page.waitForSelector("#panel-plan:not([hidden])", { timeout: 5000 });
+  await page.click("#plan-build");
+  await page.waitForTimeout(900);
+
+  eq(await page.locator(".plan-day").count(), 3, "3일 여행이면 날짜 칸이 3개");
+  eq(await page.locator("#plan-empty").isVisible(), false, "일정이 생기면 안내가 사라짐");
+  eq(await page.locator("#plan-share").isVisible(), true, "일정이 생기면 공유 버튼이 보임");
+  ok((await page.locator("#plan-note").textContent()).includes("이동시간"),
+    "이동시간을 알려줌");
+  ok((await page.locator("#plan-note").textContent()).includes("추정"),
+    "추정값이라고 솔직하게 밝힘");
+
+  const firstDay = page.locator(".plan-day").first();
+  ok((await firstDay.textContent()).includes("도착"), "첫날은 도착으로 시작");
+  ok((await page.locator(".plan-day").last().textContent()).includes("귀가"),
+    "마지막 날은 귀가로 끝");
+
+  /* 모든 장소가 어딘가에 들어갔는지 */
+  const all = await page.locator("#plan-days").textContent();
+  for (const n of ["초당순두부", "경포대", "주문진회센터"]) {
+    ok(all.includes(n), `${n} 이 일정에 들어감`);
+  }
+
+  /* 직접 고치기 — 빼기 */
+  const before = await page.locator(".plan-day .plan-slots li").count();
+  page.once("dialog", (d) => d.accept());
+  await firstDay.locator('button[data-act="drop"]').first().click();
+  await page.waitForTimeout(700);
+  const after = await page.locator(".plan-day .plan-slots li").count();
+  eq(after, before - 1, "칸 하나를 뺄 수 있다");
+
+  /* 새로고침해도 남아 있는가 */
+  await page.reload();
+  await page.waitForFunction(() => window.__roomReady === true, { timeout: 8000 });
+  await page.waitForTimeout(400);
+  await page.click('#tabs a[data-tab="plan"]');
+  await page.waitForTimeout(400);
+  eq(await page.locator(".plan-day").count(), 3, "새로고침해도 일정이 남아 있음");
+  eq(await page.locator(".plan-day .plan-slots li").count(), after,
+    "새로고침해도 고친 내용이 그대로");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
 }
 
 await browser.close();

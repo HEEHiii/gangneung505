@@ -988,3 +988,42 @@ body{
   border-left:1px dashed color-mix(in srgb, var(--text) 22%, transparent);
   border-right:1px dashed color-mix(in srgb, var(--text) 22%, transparent);
 }
+
+
+/* ───────── 일정표 ───────── */
+.plan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+
+.plan-day{
+  border:1px solid var(--line);border-radius:var(--r);
+  background:var(--surface);padding:14px 15px;margin-bottom:12px;
+}
+.plan-day h3{
+  margin:0 0 10px;font-size:15px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+}
+.plan-day h3 small{font-size:12px;color:var(--muted);font-weight:400}
+
+.plan-slots{list-style:none;margin:0;padding:0}
+.plan-slots li{
+  display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:start;
+  padding:9px 0;border-top:1px solid var(--line);
+}
+.plan-slots li:first-child{border-top:0}
+.plan-time{
+  font-variant-numeric:tabular-nums;font-weight:600;font-size:14px;
+  color:var(--accent);padding-top:1px;
+}
+.plan-what{min-width:0}
+.plan-title{font-size:14px;font-weight:600;line-height:1.4}
+.plan-note{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.5}
+.plan-drop{
+  border:0;background:transparent;color:var(--muted);cursor:pointer;
+  font-size:17px;line-height:1;padding:2px 4px;
+}
+.plan-drop:hover{color:var(--danger)}
+.plan-move{display:flex;flex-direction:column;gap:2px}
+.plan-move button{
+  border:1px solid var(--line-strong);background:var(--bg);color:var(--muted);
+  border-radius:5px;cursor:pointer;font-size:11px;line-height:1;padding:3px 5px;
+}
+.plan-move button:hover:not(:disabled){color:var(--text);border-color:var(--text)}
+.plan-move button:disabled{opacity:.3;cursor:default}

@@ -584,6 +584,93 @@ select pg_temp.ok((select count(*) from app.expenses) = 2,
 
 
 -- ============================================================
+--  9.6 일정 — 조용한 덮어쓰기를 막는가
+--
+--  ★ 505 는 일정 전체를 통짜로 저장했습니다. 두 사람이 동시에
+--    고치면 나중 사람이 앞사람 것을 통째로 덮어썼고 아무 표시도
+--    없었습니다. 친구가 한 시간 들여 짠 일정이 조용히 사라집니다.
+--    그걸 막는 게 version 이고, 여기서 실제로 확인합니다.
+-- ============================================================
+\echo '── 9.6 일정'
+reset role;
+set role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', false);
+
+insert into t select 'it1', (public.itinerary_day_save(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A', 0,
+  '[{"time":"11:00","title":"강릉역 도착"}]'::jsonb, null,
+  '2027-01-23', '1/23 (토)'))::text;
+
+insert into t select 'it2', (public.itinerary_day_save(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A', 0,
+  '[{"time":"11:00","title":"강릉역 도착"},{"time":"12:00","title":"점심"}]'::jsonb, 1))::text;
+
+-- 친구B 가 옛 버전으로 고치려 함
+insert into t select 'it3', (public.itinerary_day_save(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-B', 0,
+  '[{"time":"09:00","title":"엉뚱한 일정"}]'::jsonb, 1))::text;
+
+reset role;
+select pg_temp.ok((select v::jsonb ->> 'ok' from t where k = 'it1') = 'true', '일정 하루치 저장');
+select pg_temp.ok((select v::jsonb ->> 'version' from t where k = 'it2') = '2',
+  '같은 버전으로 고치면 version 이 올라감');
+select pg_temp.ok((select v::jsonb ->> 'ok' from t where k = 'it3') = 'false',
+  '옛 버전으로 덮어쓰려 하면 막힘');
+select pg_temp.ok((select v::jsonb ->> 'code' from t where k = 'it3') = 'stale',
+  '막힌 이유를 stale 로 알려줌 (화면이 그 날만 다시 불러옵니다)');
+select pg_temp.ok(
+  (select jsonb_array_length(slots) from app.itinerary_days where day_index = 0) = 2,
+  '★ 먼저 고친 사람 것이 그대로 남아 있다 (조용한 유실 없음)');
+select pg_temp.ok(
+  (select updated_by from app.itinerary_days where day_index = 0) = 'voter-A',
+  '덮어쓰기를 시도한 사람 이름으로 바뀌지 않았다');
+
+-- 전체 다시 짜기
+set role anon;
+insert into t select 'itb', (public.itinerary_build_save(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A',
+  '[{"day_index":0,"the_date":"2027-01-23","label":"1/23","slots":[{"time":"11:00","title":"도착"}]},
+    {"day_index":1,"the_date":"2027-01-24","label":"1/24","slots":[{"time":"09:00","title":"출발"}]}]'::jsonb))::text;
+
+-- 말이 안 되는 값
+insert into t select 'itx1', (public.itinerary_day_save(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A', 99, '[]'::jsonb))::text;
+insert into t select 'itx2', (public.itinerary_day_save(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A', 0, '"배열아님"'::jsonb))::text;
+insert into t select 'itx3', (public.itinerary_day_save(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), '', 0, '[]'::jsonb))::text;
+
+-- 스냅샷
+insert into t select 'isnap', (public.room_snapshot(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A'))::text;
+
+reset role;
+select pg_temp.ok((select v::jsonb ->> 'ok' from t where k = 'itb') = 'true', '전체 다시 짜기');
+select pg_temp.ok((select count(*) from app.itinerary_days) = 2, '이틀치가 저장됨');
+select pg_temp.ok((select v::jsonb ->> 'code' from t where k = 'itx1') = 'bad', '없는 날짜는 거부');
+select pg_temp.ok((select v::jsonb ->> 'code' from t where k = 'itx2') = 'bad', '배열이 아니면 거부');
+select pg_temp.ok((select v::jsonb ->> 'code' from t where k = 'itx3') = 'denied', '누군지 모르면 거부');
+select pg_temp.ok(
+  jsonb_array_length((select v::jsonb -> 'itinerary' from t where k = 'isnap')) = 2,
+  '스냅샷에 일정 이틀치가 실림');
+
+-- 가짜 토큰
+do $$
+declare v_blocked boolean := false;
+begin
+  begin
+    perform public.itinerary_day_save(repeat('ab',32), 'v', 0, '[]'::jsonb);
+  exception when others then v_blocked := true;
+  end;
+  if v_blocked then raise notice '  OK    가짜 토큰으로는 남의 일정을 못 고침';
+  else raise exception 'FAIL: 가짜 토큰이 통과했습니다';
+  end if;
+end $$;
+
+reset role;
+
+
+-- ============================================================
 --  10. 방 삭제는 자식까지 함께
 -- ============================================================
 \echo '── 10. 방 삭제'

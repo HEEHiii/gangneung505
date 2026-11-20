@@ -109,11 +109,25 @@
     <!-- ───────── 일정 (2단계) ───────── -->
     <section class="panel" id="panel-plan" hidden>
       <div class="panel-head"><h2>일정표</h2></div>
-      <div class="soon">
-        <strong>곧 열립니다</strong>
-        <p>숙소·맛집 투표 결과로 <strong>이동시간이 가장 짧은 순서</strong>를 짜주고,
-           그 뒤에 직접 고칠 수 있게 만들고 있어요.</p>
-        <p class="muted">지금은 숙소와 맛집을 모으고 투표하는 데 집중해주세요.</p>
+
+      <p class="field-note" id="plan-intro">
+        투표 결과로 <strong>이동시간이 가장 짧은 순서</strong>를 짜드려요.
+        밥은 밥때에, 카페는 오후에 넣습니다. 짠 뒤에는 직접 고칠 수 있어요.
+      </p>
+
+      <div class="plan-actions">
+        <button type="button" id="plan-build" class="btn-primary">투표 결과로 짜기</button>
+        <button type="button" id="plan-share" class="btn-quiet" hidden>카톡으로 보내기</button>
+      </div>
+      <p class="field-note bad" id="plan-error"></p>
+      <p class="field-note" id="plan-note"></p>
+
+      <div id="plan-days"></div>
+
+      <div class="soon" id="plan-empty">
+        <strong>아직 일정이 없어요</strong>
+        <p>숙소와 맛집에 <strong>투표</strong>한 뒤 위 버튼을 누르면
+           이동 순서를 짜드려요. 투표가 없어도 추가된 장소로 짤 수 있어요.</p>
       </div>
     </section>
 

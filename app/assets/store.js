@@ -79,6 +79,7 @@ function lsnapshot(slug, voter, since) {
     expenses: (box.expenses || [])
       .filter((e) => !e.deleted_at)
       .map((e) => ({ ...e, mine: e.created_by === voter })),
+    itinerary: (box.itinerary || []).slice().sort((a, b) => a.day_index - b.day_index),
   };
 }
 
@@ -113,6 +114,7 @@ export async function createRoom(form) {
       places: [],
       votes: {},
       expenses: [],
+      itinerary: [],
     };
     lwrite(slug, box);
     return { slug, token: LOCAL_TOKEN, local: true };
@@ -384,6 +386,76 @@ export function createStore(slug) {
         return { ok: true };
       }
       return await rpc("expense_remove", { p_token: need(), p_voter: voter, p_id: id });
+    },
+
+    /* ---------- 일정 하루치 저장 ----------
+
+       ★ 성공/실패를 값으로 돌려줍니다 (예외를 던지지 않습니다).
+         "친구가 먼저 고쳤어요" 는 오류가 아니라 정상적인 결과이고,
+         화면은 그 날만 다시 불러오면 됩니다. */
+    async itineraryDaySave(index, slots, expectedVersion, meta = {}) {
+      need();
+      const list = Array.isArray(slots) ? slots.slice(0, 40) : [];
+
+      if (!online) {
+        const box = lread(slug);
+        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+        box.itinerary = box.itinerary || [];
+        const at = box.itinerary.findIndex((d) => d.day_index === index);
+        if (at < 0) {
+          box.itinerary.push({
+            day_index: index, the_date: meta.date || null,
+            label: meta.label || null, slots: list, version: 1,
+          });
+          lwrite(slug, box);
+          return { ok: true, version: 1 };
+        }
+        const cur = box.itinerary[at];
+        if (expectedVersion != null && cur.version !== expectedVersion) {
+          return {
+            ok: false, code: "stale", version: cur.version,
+            message: "친구가 먼저 고쳤어요. 최신 내용을 불러왔어요",
+          };
+        }
+        cur.slots = list;
+        cur.version = (cur.version || 1) + 1;
+        if (meta.date) cur.the_date = meta.date;
+        if (meta.label) cur.label = meta.label;
+        lwrite(slug, box);
+        return { ok: true, version: cur.version };
+      }
+
+      return await rpc("itinerary_day_save", {
+        p_token: need(), p_voter: voter, p_index: index, p_slots: list,
+        p_expected_version: expectedVersion ?? null,
+        p_date: meta.date || null, p_label: meta.label || null,
+      });
+    },
+
+    /* ---------- 일정 전체 새로 짜기 ---------- */
+    async itinerarySave(days) {
+      need();
+      const payload = (days || []).slice(0, 15).map((d, i) => ({
+        day_index: d.day_index ?? i,
+        the_date: d.date || d.the_date || null,
+        label: d.label || null,
+        slots: (d.slots || []).slice(0, 40),
+      }));
+
+      if (!online) {
+        const box = lread(slug);
+        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+        const before = new Map((box.itinerary || []).map((d) => [d.day_index, d.version || 1]));
+        box.itinerary = payload.map((d) => ({
+          ...d, version: (before.get(d.day_index) || 0) + 1,
+        }));
+        lwrite(slug, box);
+        return { ok: true, days: payload.length };
+      }
+
+      return await rpc("itinerary_build_save", {
+        p_token: need(), p_voter: voter, p_days: payload,
+      });
     },
 
     /* ---------- 아직 쓰는 방이라고 표시 ---------- */

@@ -17,10 +17,11 @@ import { distanceKm, prettyKm, parsePos } from "./geo.js";
 import { KAKAO_JS_KEY, hasBackend, hasMap } from "./config.js";
 import { regionByCode, THEMES } from "./regions.js";
 import { loadKakao, kakaoReady, createMap } from "./kakaomap.js";
-import { searchByKeyword, seedSpots, resolveLink } from "./places.js";
+import { searchByKeyword, seedSpots, resolveLink, findHub } from "./places.js";
 import { createStore, peekRoom, resumeRoom, setRoomPassword, deleteRoom } from "./store.js";
 import { currentUser } from "./auth.js";
 import { settle } from "./settle.js";
+import { buildItinerary, enumerateDays } from "./route.js";
 import { slugFromUrl, getToken, setToken, clearToken, rememberRoom } from "./session.js";
 
 /* ───────── 상태 ───────── */
@@ -28,10 +29,11 @@ const slug = slugFromUrl();
 let store = null;
 let room = null;                 // 방 설정 (제목·날짜·지역·테마…)
 let seeded = [];                 // 지역 관광지 (화면에만, 저장하지 않음)
-const state = { places: [], counts: {}, mine: [], expenses: [], loaded: false, updatedAt: null };
+const state = { places: [], counts: {}, mine: [], expenses: [], itinerary: [],
+                loaded: false, updatedAt: null };
 
 const maps = { stay: null, food: null };
-const inited = { stay: false, food: false, money: false };
+const inited = { stay: false, food: false, money: false, plan: false };
 let selectedId = { stay: null, food: null };
 let foodCat = "all";
 
@@ -187,6 +189,7 @@ async function refresh(first = false) {
     state.counts = snap.counts || {};
     state.mine = snap.mine || [];
     state.expenses = snap.expenses || [];
+    state.itinerary = snap.itinerary || [];
     state.updatedAt = snap.updated_at;
     state.loaded = true;
 
@@ -218,6 +221,7 @@ function redrawAll() {
   if (maps.stay) maps.stay.setLodgings(lodgings(), (id) => select("stay", id, false));
   if (inited.food) renderFood();
   if (inited.money) renderMoney();
+  if (inited.plan) renderPlan();
 }
 
 
@@ -233,6 +237,7 @@ function showTab(name) {
 
   if (tab === "food" && !inited.food) initFood();
   if (tab === "money" && !inited.money) initMoney();
+  if (tab === "plan" && !inited.plan) initPlan();
   // 숨어 있던 지도는 보일 때 다시 그려야 합니다
   if (maps[tab]) maps[tab].refresh();
 }
@@ -692,6 +697,224 @@ function makeAdder({ slot, kind, mapKey, label }) {
     });
   });
 }
+
+/* ============================================================
+   일정표
+
+   ★ 짜는 것은 route.js 가 전부 합니다. 여기서는 그리기와 저장만.
+
+   ★ 저장은 "날짜별"입니다.
+     505 는 일정 전체를 통짜로 저장해서, 두 사람이 동시에 고치면
+     나중 사람이 앞사람 것을 조용히 덮어썼습니다. 여기서는 날마다
+     version 을 들고 있다가 어긋나면 "친구가 먼저 고쳤어요" 를
+     띄우고 그 날만 다시 불러옵니다.
+   ============================================================ */
+function planDays() {
+  return enumerateDays(room.start_date, room.end_date);
+}
+
+/* 투표 순위로 후보 고르기.
+   투표가 하나도 없으면 추가된 순서대로 씁니다 — "투표부터 하세요"
+   라고 막아버리면 혼자 짜보려는 사람이 아무것도 못 합니다. */
+function planCandidates() {
+  const days = planDays().length || 1;
+  const cap = Math.min(22, Math.max(4, days * 4));
+
+  const scored = state.places
+    .filter((p) => p.lat != null && p.lng != null)
+    .map((p) => ({ ...p, votes: state.counts[p.id] || 0 }));
+
+  const voted = scored.filter((p) => p.votes > 0);
+  const pool = voted.length ? voted : scored;
+
+  const lodging = pool
+    .filter((p) => p.kind === "lodging")
+    .sort((a, b) => b.votes - a.votes || a.name.localeCompare(b.name, "ko"))[0] || null;
+
+  const rest = pool
+    .filter((p) => p.kind !== "lodging")
+    .sort((a, b) => b.votes - a.votes || a.name.localeCompare(b.name, "ko"))
+    .slice(0, cap);
+
+  return { lodging, places: rest, usedVotes: voted.length > 0 };
+}
+
+function initPlan() {
+  if (inited.plan) return;
+  inited.plan = true;
+
+  $("#plan-build").addEventListener("click", onBuildPlan);
+  $("#plan-share").addEventListener("click", sharePlan);
+
+  $("#plan-days").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-act]");
+    if (!btn) return;
+    const li = btn.closest("li[data-i]");
+    const dayBox = btn.closest(".plan-day[data-d]");
+    if (!li || !dayBox) return;
+    await editDay(Number(dayBox.dataset.d), Number(li.dataset.i), btn.dataset.act);
+  });
+
+  renderPlan();
+}
+
+async function onBuildPlan() {
+  const err = (m) => { $("#plan-error").textContent = m || ""; };
+  err("");
+
+  const { lodging, places, usedVotes } = planCandidates();
+  if (!places.length && !lodging) {
+    err("먼저 숙소나 맛집을 추가해주세요");
+    return;
+  }
+  if (state.itinerary.length &&
+      !confirm("지금 일정을 지우고 투표 결과로 새로 짤까요?")) return;
+
+  const btn = $("#plan-build");
+  btn.disabled = true;
+  try {
+    /* ★ 출발 지점을 여기서 한 번 더 찾습니다.
+
+       방을 만들 때 카카오 검색으로 "강릉역" 같은 곳을 찾아 저장하는데,
+       그때 검색이 한 번 실패하면 그 방은 영영 출발 지점이 없는 채로
+       남습니다. 일정이 늘 숙소에서 시작하게 되죠. 짤 때 다시 찾으면
+       그 한 번의 실패가 영구적인 결함이 되지 않습니다. */
+    let hub = room.hub || null;
+    if (!hub && room.region_code) {
+      const region = regionByCode(room.region_code);
+      if (region && region.hubQuery && kakaoReady()) {
+        try { hub = await findHub(region); } catch (_) { /* 없으면 숙소 기준 */ }
+      }
+    }
+
+    const built = buildItinerary({
+      days: planDays(),
+      hub,
+      lodging,
+      places,
+    });
+
+    const r = await store.itinerarySave(
+      built.itinerary.map((d, i) => ({ day_index: i, date: d.date, label: d.label, slots: d.slots }))
+    );
+    if (r && r.ok === false) { err(r.message || "저장하지 못했어요"); return; }
+
+    await refresh();
+    renderPlan();
+
+    const notes = [];
+    notes.push(usedVotes ? "투표 순위로 짰어요." : "아직 투표가 없어서 추가된 순서로 짰어요.");
+    notes.push(`이동시간 약 ${built.totalMin}분 (직선거리 기준 추정이라 실제와 다를 수 있어요)`);
+    if (built.warnings.length) notes.push(built.warnings.join(" · "));
+    $("#plan-note").textContent = notes.join(" ");
+  } catch (e) {
+    err(e.message || "일정을 짜지 못했어요");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ---------- 직접 고치기 ---------- */
+async function editDay(dayIndex, slotIndex, act) {
+  const day = state.itinerary.find((d) => d.day_index === dayIndex);
+  if (!day) return;
+
+  const slots = (day.slots || []).slice();
+  if (act === "up" && slotIndex > 0) {
+    [slots[slotIndex - 1], slots[slotIndex]] = [slots[slotIndex], slots[slotIndex - 1]];
+  } else if (act === "down" && slotIndex < slots.length - 1) {
+    [slots[slotIndex], slots[slotIndex + 1]] = [slots[slotIndex + 1], slots[slotIndex]];
+  } else if (act === "drop") {
+    if (!confirm(`"${slots[slotIndex].title}"을 일정에서 뺄까요?`)) return;
+    slots.splice(slotIndex, 1);
+  } else {
+    return;
+  }
+
+  try {
+    const r = await store.itineraryDaySave(dayIndex, slots, day.version,
+      { date: day.the_date, label: day.label });
+
+    if (r && r.ok === false) {
+      /* 친구가 먼저 고쳤습니다 — 덮어쓰지 않고 최신을 보여줍니다 */
+      toast(r.message || "친구가 먼저 고쳤어요");
+      await refresh();
+      renderPlan();
+      return;
+    }
+    await refresh();
+    renderPlan();
+  } catch (e) {
+    toast(e.message || "고치지 못했어요");
+  }
+}
+
+function renderPlan() {
+  const box = $("#plan-days");
+  const has = state.itinerary.length > 0;
+
+  $("#plan-empty").hidden = has;
+  $("#plan-share").hidden = !has;
+  $("#plan-build").textContent = has ? "투표 결과로 다시 짜기" : "투표 결과로 짜기";
+
+  if (!has) { box.innerHTML = ""; return; }
+
+  const labels = planDays();
+  box.innerHTML = state.itinerary.map((d) => {
+    const label = d.label || (labels[d.day_index] && labels[d.day_index].label) || `${d.day_index + 1}일차`;
+    const slots = d.slots || [];
+    const spots = slots.filter((x) => x.placeId).length;
+
+    return `
+      <div class="plan-day" data-d="${d.day_index}">
+        <h3>${esc(label)} <small>장소 ${spots}곳</small></h3>
+        <ul class="plan-slots">
+          ${slots.length ? slots.map((x, i) => `
+            <li data-i="${i}">
+              <span class="plan-time">${esc(x.time || "")}</span>
+              <span class="plan-what">
+                <span class="plan-title">${esc(x.title || "")}</span>
+                ${x.note ? `<span class="plan-note">${esc(x.note)}</span>` : ""}
+              </span>
+              <span class="plan-move">
+                <button type="button" data-act="up" ${i === 0 ? "disabled" : ""}
+                        aria-label="위로">▲</button>
+                <button type="button" data-act="down" ${i === slots.length - 1 ? "disabled" : ""}
+                        aria-label="아래로">▼</button>
+                <button type="button" data-act="drop" class="plan-drop"
+                        aria-label="빼기">×</button>
+              </span>
+            </li>`).join("")
+            : `<li data-i="0"><span class="plan-time"></span>
+                 <span class="plan-what"><span class="plan-note">비어 있어요</span></span>
+                 <span></span></li>`}
+        </ul>
+      </div>`;
+  }).join("");
+}
+
+async function sharePlan() {
+  const lines = [`[${room ? room.title : "여행"}] 일정`];
+  for (const d of state.itinerary) {
+    const label = d.label || `${d.day_index + 1}일차`;
+    lines.push("", `■ ${label}`);
+    for (const x of d.slots || []) lines.push(`${x.time}  ${x.title}`);
+  }
+  const text = lines.join("\n");
+  const url = location.href.split("#")[0];
+
+  if (navigator.share) {
+    try { await navigator.share({ title: "여행 일정", text, url }); return; }
+    catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  try {
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    toast("일정을 복사했어요. 카톡에 붙여넣어 주세요");
+  } catch (_) {
+    toast("복사하지 못했어요. 화면을 길게 눌러 복사해주세요");
+  }
+}
+
 
 /* ============================================================
    정산

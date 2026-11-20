@@ -40,6 +40,9 @@ export const RPC = {
   room_touch:    ["p_token"],
   expense_add:    ["p_token", "p_voter", "p_item", "p_amount", "p_payer"],
   expense_remove: ["p_token", "p_voter", "p_id"],
+  itinerary_day_save:   ["p_token", "p_voter", "p_index", "p_slots",
+                         "p_expected_version", "p_date", "p_label"],
+  itinerary_build_save: ["p_token", "p_voter", "p_days"],
 
   /* ---- 로그인한 방장만 ---- */
   room_create: [
