@@ -688,7 +688,17 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
   pointer-events:none;
 }
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.field-row .field{margin-bottom:6px}
+/* ★ min-width:0 이 꼭 필요합니다.
+   grid 칸은 기본값이 min-width:auto 라서 "안의 내용보다 작아지지 않습니다".
+   그런데 아이폰 사파리의 <input type=date> 는 고유 너비가 꽤 넓어서,
+   1fr 로 반씩 나눠놔도 오른쪽 칸이 그 너비만큼 벌어지며 카드 밖으로
+   비어져 나갑니다. 도착 칸만 길어 보이고 둘 사이 간격까지 먹힙니다.
+   데스크톱 크롬에서는 멀쩡해서 눈치채기 어렵습니다. */
+.field-row .field{margin-bottom:6px;min-width:0}
+.field input[type="date"]{
+  min-width:0;                        /* 칸 너비에 맞춰 줄어들 수 있게 */
+  -webkit-appearance:none;appearance:none;   /* iOS 기본 장식이 너비를 키웁니다 */
+}
 .theme-pick{margin-bottom:8px}
 
 .field-note{margin:0 0 14px;color:var(--muted);font-size:12px;line-height:1.6}

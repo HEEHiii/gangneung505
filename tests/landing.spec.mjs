@@ -289,6 +289,61 @@ let madeUrl = "";
   await ctx.close();
 }
 
+
+/* ============================================================
+   폼 칸 너비 — 아이폰에서 날짜 칸이 비어져 나가던 문제
+
+   ★ 왜 이걸 재는가
+
+   grid 칸은 기본이 min-width:auto 라 "안의 내용보다 작아지지 않습니다".
+   아이폰 사파리의 <input type=date> 는 고유 너비가 넓어서, 1fr 로
+   반씩 나눠도 오른쪽 칸이 벌어지며 카드 밖으로 밀고 나갔습니다.
+   도착 칸만 길어 보이고 둘 사이 간격도 먹혔습니다.
+
+   눈으로는 데스크톱에서 멀쩡해 보이므로 숫자로 재야 잡힙니다.
+   ============================================================ */
+console.log("── 폼 칸 너비");
+{
+  const { ctx, page } = await open();
+
+  const box = async (sel) => page.locator(sel).boundingBox();
+
+  const start = await box("#f-start");
+  const end = await box("#f-end");
+  const title = await box("#f-title");
+  const people = await box("#f-people");
+  const region = await box("#f-region");
+
+  /* 출발과 도착은 정확히 같은 너비 (반올림 1px 허용) */
+  ok(Math.abs(start.width - end.width) <= 1,
+    `출발·도착 칸 너비가 같다  (${start.width.toFixed(1)} vs ${end.width.toFixed(1)})`);
+
+  /* 둘을 합쳐도 위아래 칸을 넘지 않는다 */
+  const pairRight = end.x + end.width;
+  const titleRight = title.x + title.width;
+  ok(pairRight <= titleRight + 1,
+    `날짜 두 칸이 위 칸 밖으로 안 나간다  (오른쪽 끝 ${pairRight.toFixed(1)} ≤ ${titleRight.toFixed(1)})`);
+
+  ok(Math.abs(start.x - title.x) <= 1,
+    "출발 칸 왼쪽 끝이 위 칸과 맞다");
+
+  /* 둘 사이에 간격이 살아 있다 — 먹히면 한 칸처럼 보입니다 */
+  const gap = end.x - (start.x + start.width);
+  ok(gap >= 6, `출발·도착 사이 간격이 살아 있다  (${gap.toFixed(1)}px)`);
+
+  /* 위아래 칸들끼리도 너비가 같다 */
+  const widths = [title.width, people.width, region.width];
+  ok(Math.max(...widths) - Math.min(...widths) <= 1,
+    `이름·인원·지역 칸 너비가 서로 같다  (${widths.map((w) => w.toFixed(0)).join(" / ")})`);
+
+  /* 가로 스크롤이 생기지 않는다 */
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok(overflow <= 0, `가로 스크롤이 없다  (넘침 ${overflow}px)`);
+
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");
