@@ -546,6 +546,8 @@ export function createStore(slug) {
       if (!online || resolveOff) return null;
       const token = need();
       lastResolveNote = "";
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 8000);
       try {
         const res = await fetch(`${SUPABASE_URL}/functions/v1/resolve-link`, {
           method: "POST",
@@ -555,7 +557,10 @@ export function createStore(slug) {
             authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({ token, url }),
-          signal: AbortSignal.timeout(8000),
+          /* AbortSignal.timeout 은 좀 된 사파리에 없습니다. 없으면
+             TypeError 가 나면서 "연결 실패"처럼 보여 원인을 헷갈리게
+             합니다. 그래서 직접 만듭니다. */
+          signal: ctl.signal,
         });
         /* 404(배포 안 됨) · 401(JWT 검사에 막힘) 처럼 "설정 문제"는
            다시 시도해도 똑같습니다. 한 번 겪으면 그만둡니다.
@@ -582,8 +587,16 @@ export function createStore(slug) {
         return null;
       } catch (e) {
         resolveOff = true;        /* 네트워크 자체가 안 되면 더 조르지 않습니다 */
-        lastResolveNote = "링크 풀기 서버에 연결하지 못했어요";
+        /* 여기로 오면 HTTP 응답조차 못 받은 것입니다. 거의 항상
+           관문(gateway)이 먼저 막아 브라우저가 CORS 오류로 처리한
+           경우입니다 — 함수는 실행조차 안 되므로 로그도 안 남습니다. */
+        lastResolveNote = (e && e.name === "AbortError")
+          ? "링크 풀기가 너무 오래 걸려요"
+          : "링크 풀기 서버에 닿지 못했어요 "
+            + "(resolve-link 의 Verify JWT 를 끄거나 함수 이름을 확인해주세요)";
         return null;
+      } finally {
+        clearTimeout(timer);
       }
     },
 
