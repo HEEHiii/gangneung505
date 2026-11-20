@@ -38,6 +38,8 @@ export const RPC = {
   place_remove:  ["p_token", "p_voter", "p_id"],
   vote_set:      ["p_token", "p_voter", "p_place_id", "p_on"],
   room_touch:    ["p_token"],
+  expense_add:    ["p_token", "p_voter", "p_item", "p_amount", "p_payer"],
+  expense_remove: ["p_token", "p_voter", "p_id"],
 
   /* ---- 로그인한 방장만 ---- */
   room_create: [

@@ -474,6 +474,116 @@ select pg_temp.must_fail($$ select public.room_list_mine() $$, 'permission denie
 
 
 -- ============================================================
+--  9.5 경비 정산
+--
+--  ★ 친구도 적고 지울 수 있어야 합니다. 총무 한 명만 적게 하면
+--    결국 카톡으로 불러주고 총무가 받아적는 꼴이 됩니다.
+--    그래서 쓰기는 "친구 입장(anon)" 으로 합니다.
+--
+--  ★ 검증 구문은 reset role 로 돌아와서 합니다.
+--    anon 은 app 스키마를 직접 못 읽는 게 정상이고, 그게 이 설계의
+--    핵심이라 테스트가 그 벽을 뚫으려 하면 안 됩니다.
+-- ============================================================
+\echo '── 9.5 경비 정산'
+-- 7절에서 비밀번호를 바꿔 tok1 은 이미 무효입니다. 그때 다시 받은 tok1b 를 씁니다.
+
+reset role;
+set role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', false);
+
+insert into t select 'ex1', (public.expense_add(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A', '숙소', 200000, '민수')) ->> 'id';
+insert into t select 'ex2', (public.expense_add(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-B', '회', 90000, '지아')) ->> 'id';
+
+-- 스냅샷은 친구도 부를 수 있어야 합니다 (화면이 읽는 유일한 경로)
+insert into t select 'esnap', (public.room_snapshot(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A'))::text;
+
+reset role;
+select pg_temp.ok((select count(*) from app.expenses where deleted_at is null) = 2,
+  '친구가 로그인 없이 지출을 적을 수 있다');
+select pg_temp.ok((select sum(amount) from app.expenses where deleted_at is null) = 290000,
+  '금액이 그대로 저장됨');
+select pg_temp.ok(
+  jsonb_array_length((select v::jsonb -> 'expenses' from t where k = 'esnap')) = 2,
+  '스냅샷에 지출 2건이 실림');
+select pg_temp.ok(
+  (select v::jsonb -> 'expenses' -> 0 ->> 'mine' from t where k = 'esnap') = 'true',
+  '내가 적은 것은 mine=true');
+select pg_temp.ok(
+  (select v::jsonb -> 'expenses' -> 1 ->> 'mine' from t where k = 'esnap') = 'false',
+  '남이 적은 것은 mine=false  (남의 것을 내 것으로 보여주면 안 됩니다)');
+select pg_temp.ok(
+  (select v::jsonb -> 'expenses' -> 0 ->> 'payer' from t where k = 'esnap') = '민수',
+  '결제자 이름이 그대로');
+
+set role anon;
+
+-- 남의 것은 못 지운다
+do $$
+declare v_blocked boolean := false; v_why text;
+begin
+  begin
+    perform public.expense_remove(
+      (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-B',
+      (select v from t where k = 'ex1')::uuid);
+  exception when others then v_blocked := true; v_why := sqlerrm;
+  end;
+  if v_blocked then raise notice '  OK    남의 지출은 못 지움 (%)', v_why;
+  else raise exception 'FAIL: 남의 지출이 지워졌습니다';
+  end if;
+end $$;
+
+-- 내 것은 지울 수 있다
+select public.expense_remove(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A',
+  (select v from t where k = 'ex1')::uuid);
+
+-- 말이 안 되는 값은 막는다
+do $$
+declare
+  v_tok text := (select v::jsonb ->> 'token' from t where k = 'tok1b');
+  v_case text;
+  v_blocked int := 0;
+begin
+  foreach v_case in array array['빈 항목','0원','1억 초과','긴 이름','긴 항목'] loop
+    begin
+      if    v_case = '빈 항목'   then perform public.expense_add(v_tok,'v','   ',1000,'민수');
+      elsif v_case = '0원'       then perform public.expense_add(v_tok,'v','밥',0,'민수');
+      elsif v_case = '1억 초과'  then perform public.expense_add(v_tok,'v','밥',100000001,'민수');
+      elsif v_case = '긴 이름'   then perform public.expense_add(v_tok,'v','밥',1000,repeat('가',21));
+      else                            perform public.expense_add(v_tok,'v',repeat('가',61),1000,'민수');
+      end if;
+    exception when others then v_blocked := v_blocked + 1;
+    end;
+  end loop;
+  if v_blocked = 5 then raise notice '  OK    말이 안 되는 값 5가지를 모두 막음';
+  else raise exception 'FAIL: 5개 중 %개만 막혔습니다', v_blocked;
+  end if;
+end $$;
+
+-- 가짜 토큰으로는 남의 방에 적을 수 없다
+do $$
+declare v_blocked boolean := false; v_why text;
+begin
+  begin
+    perform public.expense_add(repeat('ab',32), 'v', '밥', 1000, '민수');
+  exception when others then v_blocked := true; v_why := sqlerrm;
+  end;
+  if v_blocked then raise notice '  OK    가짜 토큰은 막힘 (%)', v_why;
+  else raise exception 'FAIL: 가짜 토큰이 통과했습니다';
+  end if;
+end $$;
+
+reset role;
+select pg_temp.ok((select count(*) from app.expenses where deleted_at is null) = 1,
+  '내가 적은 지출은 지울 수 있다');
+select pg_temp.ok((select count(*) from app.expenses) = 2,
+  '지운 것도 행은 남는다 (soft delete — 되살릴 수 있음)');
+
+
+-- ============================================================
 --  10. 방 삭제는 자식까지 함께
 -- ============================================================
 \echo '── 10. 방 삭제'

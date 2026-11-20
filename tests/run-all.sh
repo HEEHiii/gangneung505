@@ -8,6 +8,7 @@
 #    0) 설정 검사      config.js 에 비밀 키가 섞였는지, 반쪽만 찼는지
 #    1) 데이터 검증    지역·좌표 파일의 손으로 적은 값
 #    2) 순수 함수      거리·날짜·좌표 계산
+#    2-1) 정산 계산    1원도 새지 않는지 (무작위 2,000판)
 #    3) 계약 검증      JS 가 보내는 인자와 SQL 함수 서명이 같은지
 #    4) SQL            일회용 PostgreSQL 에 올려서 권한·격리·잠김 확인
 #    5) 브라우저        지도·저장소 (가짜 카카오 SDK, 네트워크 없음)
@@ -34,6 +35,7 @@ step() {
 step "설정 (config.js)"  node tests/config.check.mjs
 step "지역·POI 데이터"   node tests/regions.check.mjs
 step "순수 함수"         node tests/util.check.mjs
+step "정산 계산"         node tests/settle.check.mjs
 step "링크 파싱"         node tests/places.check.mjs
 step "RPC 계약"          node tests/rpc-contract.check.mjs
 

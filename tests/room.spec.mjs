@@ -396,7 +396,7 @@ let roomUrl = "";
   ok((await page.locator("#panel-plan").textContent()).includes("곧 열립니다"), "일정 탭 안내");
   await page.click('#tabs a[data-tab="money"]');
   await page.waitForTimeout(300);
-  ok((await page.locator("#panel-money").textContent()).includes("곧 열립니다"), "정산 탭 안내");
+  ok(await page.locator("#ex-form").isVisible(), "정산 탭에 지출 적는 칸이 열림");
 
   /* 주소의 # 으로도 탭이 바뀐다 */
   await page.goto(roomUrlWithHash(page.url(), "food"));
@@ -453,6 +453,98 @@ function roomUrlWithHash(current, tab) {
 
   eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
   await ctx.close();
+}
+
+
+/* ============================================================
+   정산 탭
+
+   ★ 돈이 걸린 화면이라 "눌리나"가 아니라 "숫자가 맞나"를 봅니다.
+     계산 자체는 tests/settle.check.mjs 가 2,000판 돌려 확인하므로,
+     여기서는 화면·저장·권한이 제대로 이어졌는지만 봅니다.
+   ============================================================ */
+console.log("── 정산 탭");
+{
+  const { ctx, page, errors } = await fresh();
+  await openRoom(page, await makeRoom(page, { title: "정산 시험", people: 4 }));
+  await enter(page);
+
+  await page.click('#tabs a[data-tab="money"]');
+  await page.waitForSelector("#panel-money:not([hidden])", { timeout: 5000 });
+
+  eq(await page.locator("#settlement").isVisible(), false,
+    "지출이 없으면 '주고받기'가 숨어 있음");
+
+  const addExpense = async (item, amount, payer) => {
+    await page.fill("#ex-item", item);
+    await page.fill("#ex-amount", String(amount));
+    await page.fill("#ex-payer", payer);
+    await page.click("#ex-form button[type=submit]");
+    await page.waitForTimeout(250);
+  };
+
+  await addExpense("숙소", 200000, "민수");
+  eq(await page.locator("#expense-list li").count(), 1, "지출 한 건이 목록에 보임");
+
+  const stats = async () =>
+    (await page.locator("#expense-summary .stat-v").allTextContents()).join(" / ");
+  eq(await stats(), "200,000원 / 50,000원", "총액과 1인당이 맞음 (4명)");
+
+  eq(await page.locator("#settlement").isVisible(), true, "한 명만 냈으면 정산할 게 생김");
+  eq(await page.locator("#settle-list li").count(), 3, "나머지 3명이 각각 보냄");
+  ok((await page.locator("#settle-list").textContent()).includes("50,000원"),
+    "1인분씩 보내라고 나옴");
+  ok((await page.locator("#settle-note").textContent()).includes("3명"),
+    "결제 기록이 없는 사람을 안내함");
+
+  await addExpense("회", 90000, "지아");
+  eq(await stats(), "290,000원 / 72,500원", "두 번째 지출이 합산됨");
+
+  /* 새로고침해도 남아 있어야 합니다 — 저장이 진짜 됐는지 */
+  await page.reload();
+  await page.waitForFunction(() => window.__roomReady === true, { timeout: 8000 });
+  await page.waitForTimeout(400);
+  await page.click('#tabs a[data-tab="money"]');
+  await page.waitForTimeout(300);
+  eq(await page.locator("#expense-list li").count(), 2, "새로고침해도 지출이 남아 있음");
+
+  /* 말이 안 되는 입력 */
+  await page.fill("#ex-item", "");
+  await page.fill("#ex-amount", "1000");
+  await page.fill("#ex-payer", "민수");
+  await page.click("#ex-form button[type=submit]");
+  await page.waitForTimeout(200);
+  eq(await page.locator("#expense-list li").count(), 2, "빈 항목은 안 들어감");
+
+  /* 지우기 */
+  page.once("dialog", (d) => d.accept());
+  await page.click("#expense-list li:first-child .ex-del");
+  await page.waitForTimeout(350);
+  eq(await page.locator("#expense-list li").count(), 1, "내가 적은 지출은 지울 수 있음");
+  eq(await stats(), "90,000원 / 22,500원", "지운 뒤 합계가 다시 계산됨");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
+{
+  console.log("── 정산 — 남의 지출");
+  /* 다른 브라우저 = 다른 사람. 남이 적은 지출에는 지우기 버튼이 없어야 합니다. */
+  const a = await fresh();
+  const url = await makeRoom(a.page, { title: "둘이서", people: 2 });
+  await openRoom(a.page, url);
+  await enter(a.page);
+  await a.page.click('#tabs a[data-tab="money"]');
+  await a.page.waitForSelector("#panel-money:not([hidden])", { timeout: 5000 });
+  await a.page.fill("#ex-item", "기름값");
+  await a.page.fill("#ex-amount", "40000");
+  await a.page.fill("#ex-payer", "민수");
+  await a.page.click("#ex-form button[type=submit]");
+  await a.page.waitForTimeout(300);
+  eq(await a.page.locator("#expense-list .ex-del[data-id]").count(), 1,
+    "내가 적은 것에는 지우기 버튼이 있다");
+
+  await a.ctx.close();
 }
 
 await browser.close();

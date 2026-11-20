@@ -76,6 +76,9 @@ function lsnapshot(slug, voter, since) {
     places: alive.map((p) => ({ ...p, mine: p.created_by === voter })),
     counts,
     mine,
+    expenses: (box.expenses || [])
+      .filter((e) => !e.deleted_at)
+      .map((e) => ({ ...e, mine: e.created_by === voter })),
   };
 }
 
@@ -109,6 +112,7 @@ export async function createRoom(form) {
       pw: String(form.password || ""),
       places: [],
       votes: {},
+      expenses: [],
     };
     lwrite(slug, box);
     return { slug, token: LOCAL_TOKEN, local: true };
@@ -324,6 +328,62 @@ export function createStore(slug) {
       return await rpc("vote_set", {
         p_token: need(), p_voter: voter, p_place_id: placeId, p_on: !!on,
       });
+    },
+
+    /* ---------- 지출 적기 ----------
+       ★ 친구도 적을 수 있어야 합니다. 총무 한 명만 적게 하면 결국
+         카톡으로 불러주고 총무가 받아적는 꼴이 됩니다. */
+    async expenseAdd({ item, amount, payer }) {
+      const clean = {
+        item: String(item || "").trim().slice(0, 60),
+        amount: Math.round(Number(amount) || 0),
+        payer: String(payer || "").trim().slice(0, 20),
+      };
+      if (!clean.item) throw new RpcError("bad", "어디에 썼는지 적어주세요", "no item");
+      if (!clean.payer) throw new RpcError("bad", "누가 냈는지 적어주세요", "no payer");
+      if (!(clean.amount > 0)) throw new RpcError("bad", "금액을 적어주세요", "no amount");
+      if (clean.amount > 100000000) {
+        throw new RpcError("bad", "금액이 너무 커요 (1억까지)", "too big");
+      }
+
+      need();
+      if (!online) {
+        const box = lread(slug);
+        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+        box.expenses = box.expenses || [];
+        if (box.expenses.filter((e) => !e.deleted_at).length >= 300) {
+          throw new RpcError("limit", "한 방에 적을 수 있는 지출을 넘었어요 (300개)", "cap");
+        }
+        const id = newId("e");
+        box.expenses.push({
+          ...clean, id, created_by: voter, created_at: new Date().toISOString(),
+        });
+        lwrite(slug, box);
+        return { id };
+      }
+
+      return await rpc("expense_add", {
+        p_token: need(), p_voter: voter,
+        p_item: clean.item, p_amount: clean.amount, p_payer: clean.payer,
+      });
+    },
+
+    /* ---------- 지출 지우기 (되돌릴 수 있게 표시만) ---------- */
+    async expenseRemove(id) {
+      need();
+      if (!online) {
+        const box = lread(slug);
+        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+        const e = (box.expenses || []).find((x) => x.id === id && !x.deleted_at);
+        if (!e) throw new RpcError("denied", "없는 지출이에요", "miss");
+        if (e.created_by !== voter) {
+          throw new RpcError("denied", "직접 적은 것만 지울 수 있어요", "not mine");
+        }
+        e.deleted_at = new Date().toISOString();
+        lwrite(slug, box);
+        return { ok: true };
+      }
+      return await rpc("expense_remove", { p_token: need(), p_voter: voter, p_id: id });
     },
 
     /* ---------- 아직 쓰는 방이라고 표시 ---------- */

@@ -12,7 +12,7 @@
    아직 없는 것: 일정·정산 (2단계)
    ============================================================ */
 
-import { $, $$, esc, toast, fmtRange } from "./dom.js";
+import { $, $$, esc, toast, fmtRange, won } from "./dom.js";
 import { distanceKm, prettyKm, parsePos } from "./geo.js";
 import { KAKAO_JS_KEY, hasBackend, hasMap } from "./config.js";
 import { regionByCode, THEMES } from "./regions.js";
@@ -20,6 +20,7 @@ import { loadKakao, kakaoReady, createMap } from "./kakaomap.js";
 import { searchByKeyword, seedSpots, resolveLink } from "./places.js";
 import { createStore, peekRoom, resumeRoom, setRoomPassword, deleteRoom } from "./store.js";
 import { currentUser } from "./auth.js";
+import { settle } from "./settle.js";
 import { slugFromUrl, getToken, setToken, clearToken, rememberRoom } from "./session.js";
 
 /* ───────── 상태 ───────── */
@@ -27,10 +28,10 @@ const slug = slugFromUrl();
 let store = null;
 let room = null;                 // 방 설정 (제목·날짜·지역·테마…)
 let seeded = [];                 // 지역 관광지 (화면에만, 저장하지 않음)
-const state = { places: [], counts: {}, mine: [], loaded: false, updatedAt: null };
+const state = { places: [], counts: {}, mine: [], expenses: [], loaded: false, updatedAt: null };
 
 const maps = { stay: null, food: null };
-const inited = { stay: false, food: false };
+const inited = { stay: false, food: false, money: false };
 let selectedId = { stay: null, food: null };
 let foodCat = "all";
 
@@ -185,6 +186,7 @@ async function refresh(first = false) {
     state.places = snap.places || [];
     state.counts = snap.counts || {};
     state.mine = snap.mine || [];
+    state.expenses = snap.expenses || [];
     state.updatedAt = snap.updated_at;
     state.loaded = true;
 
@@ -215,6 +217,7 @@ function redrawAll() {
   renderLodgings();
   if (maps.stay) maps.stay.setLodgings(lodgings(), (id) => select("stay", id, false));
   if (inited.food) renderFood();
+  if (inited.money) renderMoney();
 }
 
 
@@ -229,6 +232,7 @@ function showTab(name) {
   $$("#tabs a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
 
   if (tab === "food" && !inited.food) initFood();
+  if (tab === "money" && !inited.money) initMoney();
   // 숨어 있던 지도는 보일 때 다시 그려야 합니다
   if (maps[tab]) maps[tab].refresh();
 }
@@ -688,6 +692,152 @@ function makeAdder({ slot, kind, mapKey, label }) {
     });
   });
 }
+
+/* ============================================================
+   정산
+
+   계산은 settle.js 가 전부 합니다. 여기서는 그리기만 합니다.
+   돈 계산을 화면 코드에 섞으면 테스트가 불가능해집니다 —
+   505 가 정확히 그래서 한 번도 검증된 적이 없었습니다.
+   ============================================================ */
+function initMoney() {
+  if (inited.money) return;
+  inited.money = true;
+
+  const err = (m) => { $("#ex-error").textContent = m || ""; };
+
+  $("#ex-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    err("");
+    const item = $("#ex-item").value.trim();
+    const amount = Number($("#ex-amount").value);
+    const payer = $("#ex-payer").value.trim();
+
+    if (!item || !payer || !(amount > 0)) {
+      err("항목·금액·결제자를 모두 적어주세요");
+      return;
+    }
+
+    const btn = $("#ex-form button[type=submit]");
+    btn.disabled = true;
+    try {
+      await store.expenseAdd({ item, amount, payer });
+      $("#ex-item").value = "";
+      $("#ex-amount").value = "";
+      /* 결제자는 지우지 않습니다 — 보통 같은 사람이 연달아 적습니다 */
+      $("#ex-item").focus();
+      await refresh();
+      renderMoney();
+    } catch (e) {
+      err(e.message || "저장하지 못했어요");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $("#expense-list").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest(".ex-del");
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const row = state.expenses.find((e) => e.id === id);
+    if (!row) return;
+    if (!confirm(`"${row.item}" ${won(row.amount)}을 지울까요?`)) return;
+
+    btn.disabled = true;
+    try {
+      await store.expenseRemove(id);
+      await refresh();
+      renderMoney();
+    } catch (e) {
+      toast(e.message || "지우지 못했어요");
+      btn.disabled = false;
+    }
+  });
+
+  $("#settle-share").addEventListener("click", shareSettlement);
+
+  renderMoney();
+}
+
+function renderMoney() {
+  const result = settle(state.expenses, room ? room.people : 1);
+
+  $("#expense-summary").innerHTML = `
+    <div class="stat"><div class="stat-k">총 지출</div>
+      <div class="stat-v">${won(result.total)}</div></div>
+    <div class="stat"><div class="stat-k">1인당 (${result.people}명)</div>
+      <div class="stat-v">${won(result.share)}</div></div>`;
+
+  $("#expense-list").innerHTML = state.expenses.length
+    ? state.expenses.map((e) => `
+        <li>
+          <span class="ex-item">${esc(e.item)}</span>
+          <span class="ex-payer">${esc(e.payer)}</span>
+          <span class="ex-amount">${won(e.amount)}</span>
+          ${e.mine
+            ? `<button class="ex-del" type="button" data-id="${esc(e.id)}"
+                       aria-label="${esc(e.item)} 지우기">×</button>`
+            : `<span class="ex-del" aria-hidden="true"></span>`}
+        </li>`).join("")
+    : '<li class="empty">아직 적은 지출이 없어요.</li>';
+
+  const box = $("#settlement");
+  if (!result.transfers.length) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+
+  $("#settle-list").innerHTML = result.transfers.map((t) => `
+    <li><em>${esc(t.from)}</em> → <em>${esc(t.to)}</em> ${won(t.amount)}</li>`).join("");
+
+  $("#settle-note").textContent = result.ghosts
+    ? `${result.people}명 중 ${result.people - result.ghosts}명만 결제 기록이 있어요. `
+      + `나머지 ${result.ghosts}명은 이름 대신 임시로 표시했습니다.`
+    : "";
+}
+
+/* ---------- 카톡으로 보내기 ----------
+
+   ★ 진짜 알림(알림톡)은 사업자 등록과 건당 과금이 필요합니다.
+     여기서 하는 건 "공유 시트를 열어주는 것"입니다 — 누르면 카톡이
+     뜨고, 단톡방을 고르면 정산 결과가 링크와 함께 전송됩니다.
+
+   navigator.share 는 아이폰·안드로이드에서 카톡을 포함한 공유 목록을
+   띄웁니다. 데스크톱에는 대부분 없으므로 클립보드로 떨어집니다. */
+function settlementText() {
+  const result = settle(state.expenses, room ? room.people : 1);
+  const lines = result.transfers.map((t) => `· ${t.from} → ${t.to} ${won(t.amount)}`);
+  return [
+    `[${room ? room.title : "여행"}] 정산`,
+    `총 ${won(result.total)} · 1인당 ${won(result.share)}`,
+    "",
+    ...lines,
+  ].join("\n");
+}
+
+async function shareSettlement() {
+  const text = settlementText();
+  const url = location.href.split("#")[0];
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "여행 정산", text, url });
+      return;
+    } catch (e) {
+      /* 사용자가 취소한 것은 실패가 아닙니다 — 조용히 넘어갑니다 */
+      if (e && e.name === "AbortError") return;
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    toast("정산 내용을 복사했어요. 카톡에 붙여넣어 주세요");
+  } catch (_) {
+    toast("복사하지 못했어요. 화면을 길게 눌러 복사해주세요");
+  }
+}
+
 
 function regionBbox() {
   const r = room && room.region_code ? regionByCode(room.region_code) : null;

@@ -159,11 +159,16 @@ for (const n of Object.keys(grants)) {
    ============================================================ */
 console.log("── 스냅샷 키");
 const EXPECTED_SNAPSHOT_KEYS =
-  ["counts", "mine", "places", "room", "unchanged", "updated_at"];
+  ["counts", "expenses", "mine", "places", "room", "unchanged", "updated_at"];
 
 {
-  // room_snapshot 본문에서 최상위 jsonb_build_object 의 키만 뽑습니다
-  const i = sql.indexOf("function public.room_snapshot");
+  /* room_snapshot 본문에서 최상위 jsonb_build_object 의 키만 뽑습니다.
+
+     ★ lastIndexOf 입니다. 뒤 마이그레이션이 create or replace 로 다시
+       정의하면 데이터베이스는 "마지막" 것을 씁니다. 첫 번째를 읽으면
+       한참 전에 바뀐 모양을 계속 맞다고 하게 됩니다 (실제로 0004 가
+       expenses 를 더했는데 이 검사가 못 봤습니다). */
+  const i = sql.lastIndexOf("function public.room_snapshot");
   const body = sql.slice(i, sql.indexOf("$$;", i));
 
   // unchanged 가 먼저 반환되는 짧은 경로도 같은 키 둘을 씁니다

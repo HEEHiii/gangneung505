@@ -120,10 +120,54 @@
     <!-- ───────── 정산 (2단계) ───────── -->
     <section class="panel" id="panel-money" hidden>
       <div class="panel-head"><h2>경비 정산</h2></div>
-      <div class="soon">
-        <strong>곧 열립니다</strong>
-        <p>쓴 돈을 적으면 1인당 얼마인지,
-           <strong>누가 누구에게 얼마를 보내면 되는지</strong> 계산해줍니다.</p>
+
+      <p class="field-note">
+        쓴 돈을 적으면 1인당 얼마인지,
+        <strong>누가 누구에게 얼마를 보내면 되는지</strong> 계산해줍니다.
+        친구들도 각자 적을 수 있어요.
+      </p>
+
+      <div class="card">
+        <h3 class="card-title">지출 적기</h3>
+        <form id="ex-form" autocomplete="off">
+          <label class="field">
+            <span class="field-label">어디에 썼나요</span>
+            <input id="ex-item" type="text" maxlength="60" placeholder="예: 숙소, 저녁, 기름값" required>
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span class="field-label">금액</span>
+              <input id="ex-amount" type="number" inputmode="numeric" min="1" max="100000000"
+                     placeholder="0" required>
+              <span class="field-suffix">원</span>
+            </label>
+            <label class="field">
+              <span class="field-label">누가 냈나요</span>
+              <input id="ex-payer" type="text" maxlength="20" placeholder="예: 민수" required>
+            </label>
+          </div>
+          <p class="field-note">
+            실명 대신 <strong>별명</strong>을 권해요. 링크를 가진 사람은 누구나 볼 수 있어요.
+            계좌번호는 적지 말아주세요.
+          </p>
+
+          <button type="submit" class="btn-primary">추가</button>
+          <p class="field-note bad" id="ex-error"></p>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">쓴 돈</h3>
+        <div id="expense-summary" class="summary"></div>
+        <ul id="expense-list" class="expense-list"></ul>
+      </div>
+
+      <div class="card settlement" id="settlement" hidden>
+        <h3 class="card-title">이렇게 주고받으면 끝</h3>
+        <ul id="settle-list"></ul>
+        <p class="field-note" id="settle-note"></p>
+        <button type="button" id="settle-share" class="btn-quiet">카톡으로 보내기</button>
       </div>
     </section>
   </main>
