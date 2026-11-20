@@ -16,7 +16,7 @@
      그래서 두 순서를 다 넣어보고 "한국 안에 떨어지는 쪽"을 고릅니다.
    ============================================================ */
 
-import { coordsFromUrl, nameFromUrl, isShortUrl } from "../app/assets/places.js";
+import { coordsFromUrl, nameFromUrl, isShortUrl , hintFor } from "../app/assets/places.js";
 
 let fails = 0;
 const ok = (cond, what) => {
@@ -121,6 +121,20 @@ ok(!isShortUrl("그냥 글자"), "주소가 아니면 false");
 /* ============================================================
    결과
    ============================================================ */
+console.log("── 못 찾았을 때 안내");
+{
+  const air = hintFor("https://www.airbnb.co.kr/rooms/12345678");
+  ok(air.includes("에어비앤비"), "에어비앤비는 왜 안 되는지 알려준다");
+  ok(air.includes("예약 링크"), "대신 할 수 있는 방법을 알려준다");
+  ok(!air.includes("못 찾았어요"), "사용자 잘못처럼 말하지 않는다");
+
+  ok(hintFor("https://abnb.me/xyz").includes("에어비앤비"), "에어비앤비 짧은 링크도 같게");
+  ok(hintFor("https://www.yanolja.com/stay/1").includes("예약 링크"), "다른 예약 사이트도");
+  ok(hintFor("https://naver.me/abcd").includes("짧은 링크"), "짧은 링크는 짧은 링크대로");
+  ok(hintFor("https://example.com/x").includes("못 찾았어요"), "모르는 사이트는 일반 안내");
+  ok(hintFor("아무거나").length > 0, "주소가 아니어도 터지지 않는다");
+}
+
 console.log("");
 if (fails === 0) console.log("전부 통과");
 else { console.log(`실패 ${fails}건`); process.exit(1); }
