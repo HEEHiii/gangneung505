@@ -671,6 +671,105 @@ reset role;
 
 
 -- ============================================================
+--  9.7 댓글
+--
+--  ★ 투표는 익명, 댓글은 별명입니다. 목적이 다릅니다.
+--    그런데 스냅샷에 voter_key 가 섞여 나가면 "이 댓글 쓴 사람이
+--    이 숙소에 투표했네"가 되어, 투표 익명성이 댓글을 통해
+--    깨집니다. 그게 새지 않는지가 여기서 제일 중요한 검사입니다.
+-- ============================================================
+\echo '── 9.7 댓글'
+reset role;
+set role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', false);
+
+insert into t select 'c1', (public.comment_add(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A',
+  'place', (select v::jsonb ->> 'id' from t where k = 'place1')::uuid,
+  '여기 바다 보여요', '민수')) ->> 'id';
+
+insert into t select 'c2', (public.comment_add(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-B',
+  'place', (select v::jsonb ->> 'id' from t where k = 'place1')::uuid,
+  '주차 되나요?', '지아')) ->> 'id';
+
+insert into t select 'csnap', (public.room_snapshot(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A'))::text;
+
+reset role;
+select pg_temp.ok((select count(*) from app.comments where deleted_at is null) = 2, '댓글 2개 달림');
+select pg_temp.ok(
+  jsonb_array_length((select v::jsonb -> 'comments' from t where k = 'csnap')) = 2,
+  '스냅샷에 댓글이 실림');
+select pg_temp.ok(
+  (select v::jsonb -> 'comments' -> 0 ->> 'nick' from t where k = 'csnap') = '민수',
+  '별명이 보인다 (댓글은 익명이 아닙니다)');
+select pg_temp.ok(
+  (select v::jsonb -> 'comments' -> 0 ->> 'mine' from t where k = 'csnap') = 'true',
+  '내가 쓴 것은 mine=true');
+select pg_temp.ok(
+  (select v::jsonb -> 'comments' -> 1 ->> 'mine' from t where k = 'csnap') = 'false',
+  '남이 쓴 것은 mine=false');
+
+-- ★ 핵심: voter_key 가 스냅샷 어디에도 없어야 합니다
+select pg_temp.ok(
+  (select v from t where k = 'csnap') not like '%voter_key%',
+  '★ 스냅샷에 voter_key 라는 칸이 없다');
+select pg_temp.ok(
+  (select v from t where k = 'csnap') not like '%voter-B%',
+  '★ 남의 voter_key 값이 새어 나가지 않는다 (투표 익명성 유지)');
+
+set role anon;
+-- 남의 댓글은 못 지운다
+do $$
+declare v_blocked boolean := false; v_why text;
+begin
+  begin
+    perform public.comment_remove(
+      (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-B',
+      (select v from t where k = 'c1')::uuid);
+  exception when others then v_blocked := true; v_why := sqlerrm;
+  end;
+  if v_blocked then raise notice '  OK    남의 댓글은 못 지움 (%)', v_why;
+  else raise exception 'FAIL: 남의 댓글이 지워졌습니다';
+  end if;
+end $$;
+
+select public.comment_remove(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A',
+  (select v from t where k = 'c1')::uuid);
+
+-- 말이 안 되는 값
+do $$
+declare
+  v_tok text := (select v::jsonb ->> 'token' from t where k = 'tok1b');
+  v_pid uuid := (select v::jsonb ->> 'id' from t where k = 'place1')::uuid;
+  v_case text; v_blocked int := 0;
+begin
+  foreach v_case in array array['빈 내용','500자 초과','빈 별명','긴 별명','없는 장소','이상한 대상'] loop
+    begin
+      if    v_case = '빈 내용'    then perform public.comment_add(v_tok,'v','place',v_pid,'   ','민수');
+      elsif v_case = '500자 초과' then perform public.comment_add(v_tok,'v','place',v_pid,repeat('가',501),'민수');
+      elsif v_case = '빈 별명'    then perform public.comment_add(v_tok,'v','place',v_pid,'좋아요','  ');
+      elsif v_case = '긴 별명'    then perform public.comment_add(v_tok,'v','place',v_pid,'좋아요',repeat('가',13));
+      elsif v_case = '없는 장소'  then perform public.comment_add(v_tok,'v','place',
+                                        '00000000-0000-0000-0000-000000000000'::uuid,'좋아요','민수');
+      else                             perform public.comment_add(v_tok,'v','엉뚱',v_pid,'좋아요','민수');
+      end if;
+    exception when others then v_blocked := v_blocked + 1;
+    end;
+  end loop;
+  if v_blocked = 6 then raise notice '  OK    말이 안 되는 값 6가지를 모두 막음';
+  else raise exception 'FAIL: 6개 중 %개만 막혔습니다', v_blocked;
+  end if;
+end $$;
+
+reset role;
+select pg_temp.ok((select count(*) from app.comments where deleted_at is null) = 1,
+  '내가 쓴 댓글은 지울 수 있다');
+
+
+-- ============================================================
 --  10. 방 삭제는 자식까지 함께
 -- ============================================================
 \echo '── 10. 방 삭제'

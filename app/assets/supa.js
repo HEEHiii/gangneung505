@@ -43,6 +43,8 @@ export const RPC = {
   itinerary_day_save:   ["p_token", "p_voter", "p_index", "p_slots",
                          "p_expected_version", "p_date", "p_label"],
   itinerary_build_save: ["p_token", "p_voter", "p_days"],
+  comment_add:    ["p_token", "p_voter", "p_target_type", "p_target_id", "p_body", "p_nick"],
+  comment_remove: ["p_token", "p_voter", "p_id"],
 
   /* ---- 로그인한 방장만 ---- */
   room_create: [

@@ -176,7 +176,7 @@ for (const n of Object.keys(grants)) {
    ============================================================ */
 console.log("── 스냅샷 키");
 const EXPECTED_SNAPSHOT_KEYS =
-  ["counts", "expenses", "itinerary", "mine", "places", "room", "unchanged", "updated_at"];
+  ["comments", "counts", "expenses", "itinerary", "mine", "places", "room", "unchanged", "updated_at"];
 
 {
   /* room_snapshot 본문에서 최상위 jsonb_build_object 의 키만 뽑습니다.

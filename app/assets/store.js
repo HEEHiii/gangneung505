@@ -80,6 +80,14 @@ function lsnapshot(slug, voter, since) {
       .filter((e) => !e.deleted_at)
       .map((e) => ({ ...e, mine: e.created_by === voter })),
     itinerary: (box.itinerary || []).slice().sort((a, b) => a.day_index - b.day_index),
+    comments: (box.comments || [])
+      .filter((c) => !c.deleted_at && c.target_type === "place")
+      .map((c) => ({
+        id: c.id, target_type: c.target_type, target_id: c.target_id,
+        body: c.body, nick: c.nick,
+        mine: c.voter_key === voter,          /* voter_key 는 내보내지 않습니다 */
+        created_at: c.created_at,
+      })),
   };
 }
 
@@ -115,6 +123,7 @@ export async function createRoom(form) {
       votes: {},
       expenses: [],
       itinerary: [],
+      comments: [],
     };
     lwrite(slug, box);
     return { slug, token: LOCAL_TOKEN, local: true };
@@ -456,6 +465,64 @@ export function createStore(slug) {
       return await rpc("itinerary_build_save", {
         p_token: need(), p_voter: voter, p_days: payload,
       });
+    },
+
+    /* ---------- 댓글 달기 ----------
+       ★ 투표는 익명, 댓글은 별명입니다. 목적이 다릅니다 —
+         투표는 눈치 안 보고 고르라고, 댓글은 대화가 되라고. */
+    async commentAdd({ targetType = "place", targetId, body, nick }) {
+      const clean = {
+        body: String(body || "").trim().slice(0, 500),
+        nick: String(nick || "").trim().slice(0, 12),
+      };
+      if (!clean.body) throw new RpcError("bad", "내용을 적어주세요", "no body");
+      if (!clean.nick) throw new RpcError("bad", "별명을 적어주세요", "no nick");
+      if (!targetId) throw new RpcError("bad", "어디에 다는 댓글인지 알 수 없어요", "no target");
+
+      need();
+      if (!online) {
+        const box = lread(slug);
+        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+        box.comments = box.comments || [];
+        if (!box.places.some((p) => p.id === targetId && !p.deleted_at)) {
+          throw new RpcError("denied", "없는 장소예요", "miss");
+        }
+        if (box.comments.filter((c) => !c.deleted_at).length >= 200) {
+          throw new RpcError("limit", "한 방에 달 수 있는 댓글을 넘었어요 (200개)", "cap");
+        }
+        const id = newId("c");
+        box.comments.push({
+          id, target_type: targetType, target_id: targetId,
+          body: clean.body, nick: clean.nick,
+          voter_key: voter, created_at: new Date().toISOString(),
+        });
+        lwrite(slug, box);
+        return { id };
+      }
+
+      return await rpc("comment_add", {
+        p_token: need(), p_voter: voter,
+        p_target_type: targetType, p_target_id: targetId,
+        p_body: clean.body, p_nick: clean.nick,
+      });
+    },
+
+    /* ---------- 댓글 지우기 ---------- */
+    async commentRemove(id) {
+      need();
+      if (!online) {
+        const box = lread(slug);
+        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+        const c = (box.comments || []).find((x) => x.id === id && !x.deleted_at);
+        if (!c) throw new RpcError("denied", "없는 댓글이에요", "miss");
+        if (c.voter_key !== voter) {
+          throw new RpcError("denied", "직접 쓴 댓글만 지울 수 있어요", "not mine");
+        }
+        c.deleted_at = new Date().toISOString();
+        lwrite(slug, box);
+        return { ok: true };
+      }
+      return await rpc("comment_remove", { p_token: need(), p_voter: voter, p_id: id });
     },
 
     /* ---------- 아직 쓰는 방이라고 표시 ---------- */

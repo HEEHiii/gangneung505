@@ -652,6 +652,80 @@ console.log("── 일정 탭");
   await ctx.close();
 }
 
+
+/* ============================================================
+   댓글
+
+   ★ 보는 것: 별명을 한 번만 묻는가, 남의 댓글에 지우기 버튼이
+     없는가, 카드 클릭(지도 따라가기)과 부딪히지 않는가.
+   ============================================================ */
+console.log("── 댓글");
+{
+  const { ctx, page, errors } = await fresh();
+  await openRoom(page, await makeRoom(page, { title: "댓글 시험" }));
+  await enter(page);
+
+  await page.click("#adder-stay summary");
+  await page.fill("#adder-stay .a-q", "https://map.kakao.com/link/map/오붓한강릉,37.8250,128.8780");
+  await page.click("#adder-stay .a-find");
+  await page.waitForTimeout(700);
+  eq(await page.locator("#lodging-list .card").count(), 1, "숙소가 하나 추가됨");
+
+  const cmts = page.locator("#lodging-list .cmts").first();
+  eq(await cmts.count(), 1, "카드에 댓글 영역이 있음");
+  ok((await cmts.textContent()).includes("댓글"), "접힌 상태로 '댓글' 이라고 보임");
+
+  await cmts.locator("summary").click();
+  await page.waitForTimeout(200);
+  eq(await cmts.locator(".cmt-input").isVisible(), true, "누르면 펼쳐짐");
+
+  /* 첫 댓글 — 별명을 묻는다 */
+  let asked = 0;
+  page.on("dialog", async (d) => {
+    if (d.type() === "prompt") { asked++; await d.accept("민수"); }
+    else await d.accept();
+  });
+
+  await cmts.locator(".cmt-input").fill("여기 바다 보여요");
+  await cmts.locator(".cmt-form button").click();
+  await page.waitForTimeout(800);
+
+  eq(asked, 1, "첫 댓글에서 별명을 한 번 묻는다");
+  ok((await page.locator("#lodging-list").textContent()).includes("여기 바다 보여요"),
+    "댓글이 보인다");
+  ok((await page.locator("#lodging-list").textContent()).includes("민수"),
+    "별명이 같이 보인다");
+
+  /* 두 번째 댓글 — 다시 묻지 않는다 */
+  const open = page.locator("#lodging-list .cmts").first();
+  if (!(await open.locator(".cmt-input").isVisible())) await open.locator("summary").click();
+  await open.locator(".cmt-input").fill("주차 되나요?");
+  await open.locator(".cmt-form button").click();
+  await page.waitForTimeout(800);
+
+  eq(asked, 1, "두 번째 댓글에서는 별명을 다시 묻지 않는다");
+  eq(await page.locator("#lodging-list .cmt-list li").count(), 2, "댓글이 2개");
+
+  /* 내 댓글에는 지우기 버튼이 있다 */
+  eq(await page.locator("#lodging-list .cmt-del").count(), 2,
+    "내가 쓴 댓글에는 지우기 버튼이 있다");
+
+  await page.locator("#lodging-list .cmt-del").first().click();
+  await page.waitForTimeout(800);
+  eq(await page.locator("#lodging-list .cmt-list li").count(), 1, "내 댓글을 지울 수 있다");
+
+  /* 새로고침해도 남아 있는가 */
+  await page.reload();
+  await page.waitForFunction(() => window.__roomReady === true, { timeout: 8000 });
+  await page.waitForTimeout(500);
+  await page.locator("#lodging-list .cmts summary").first().click();
+  await page.waitForTimeout(200);
+  eq(await page.locator("#lodging-list .cmt-list li").count(), 1, "새로고침해도 댓글이 남아 있음");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");

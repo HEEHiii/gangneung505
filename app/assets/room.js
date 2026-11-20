@@ -22,7 +22,8 @@ import { createStore, peekRoom, resumeRoom, setRoomPassword, deleteRoom } from "
 import { currentUser } from "./auth.js";
 import { settle } from "./settle.js";
 import { buildItinerary, enumerateDays } from "./route.js";
-import { slugFromUrl, getToken, setToken, clearToken, rememberRoom } from "./session.js";
+import { slugFromUrl, getToken, setToken, clearToken, rememberRoom,
+         getNick, setNick } from "./session.js";
 
 /* ───────── 상태 ───────── */
 const slug = slugFromUrl();
@@ -30,7 +31,7 @@ let store = null;
 let room = null;                 // 방 설정 (제목·날짜·지역·테마…)
 let seeded = [];                 // 지역 관광지 (화면에만, 저장하지 않음)
 const state = { places: [], counts: {}, mine: [], expenses: [], itinerary: [],
-                loaded: false, updatedAt: null };
+                comments: [], loaded: false, updatedAt: null };
 
 const maps = { stay: null, food: null };
 const inited = { stay: false, food: false, money: false, plan: false };
@@ -190,6 +191,7 @@ async function refresh(first = false) {
     state.mine = snap.mine || [];
     state.expenses = snap.expenses || [];
     state.itinerary = snap.itinerary || [];
+    state.comments = snap.comments || [];
     state.updatedAt = snap.updated_at;
     state.loaded = true;
 
@@ -345,11 +347,13 @@ function renderLodgings() {
             ${d.mine ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
             <span class="vote-count" data-count="${esc(d.id)}"><strong>0</strong>표</span>
           </div>
+          ${commentsHtml(d.id)}
         </div>
       </div>
     </li>`;
   }).join("");
 
+  wireComments("#lodging-list");
   keepSelection("stay", "#lodging-list", list);
   paintVotes();
 }
@@ -412,10 +416,12 @@ function renderFood() {
               ${d.mine ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
               <span class="vote-count" data-count="${esc(d.id)}"><strong>0</strong>표</span>
             </div>
+            ${commentsHtml(d.id)}
           </div>
         </div>
       </li>`;
     }).join("");
+    wireComments("#food-list");
   }
 
   // 지도에는 분류와 무관하게 전부 — 맛집 탭에서는 이게 주인공입니다
@@ -697,6 +703,119 @@ function makeAdder({ slot, kind, mapKey, label }) {
     });
   });
 }
+
+/* ============================================================
+   댓글 — 숙소·맛집 카드마다
+
+   ★ 투표는 익명, 댓글은 별명입니다. 목적이 다릅니다.
+     투표는 눈치 안 보고 고르라고 익명이고, 댓글은 대화가 되라고
+     별명을 씁니다. 완전 익명 댓글은 "누가 쓴 거야?"가 되어
+     오히려 불편합니다.
+
+     별명은 방마다 한 번만 받고 기억합니다. 댓글마다 이름을
+     다시 묻는 앱은 아무도 두 번째 댓글을 달지 않습니다.
+   ============================================================ */
+function commentsFor(placeId) {
+  return state.comments.filter((c) => c.target_id === placeId);
+}
+
+/* 카드 안에 들어갈 댓글 영역.
+   <details> 라 기본은 접혀 있고, 개수는 접힌 채로도 보입니다. */
+function commentsHtml(placeId) {
+  const list = commentsFor(placeId);
+  const n = list.length;
+
+  return `
+    <details class="cmts" data-cmt="${esc(placeId)}"${n ? "" : ""}>
+      <summary>댓글${n ? ` <strong>${n}</strong>` : ""}</summary>
+      <ul class="cmt-list">
+        ${list.map((c) => `
+          <li data-cid="${esc(c.id)}">
+            <span class="cmt-nick">${esc(c.nick)}</span>
+            <span class="cmt-body">${esc(c.body)}</span>
+            ${c.mine ? `<button type="button" class="cmt-del" data-cdel="${esc(c.id)}"
+                                aria-label="내 댓글 지우기">×</button>` : ""}
+          </li>`).join("")}
+      </ul>
+      <form class="cmt-form">
+        <input class="cmt-input" type="text" maxlength="500" placeholder="한마디 남기기">
+        <button type="submit" class="btn-quiet">등록</button>
+      </form>
+    </details>`;
+}
+
+/* 별명을 아직 안 정했으면 한 번만 묻습니다 */
+function ensureNick() {
+  let nick = getNick(slug);
+  if (nick) return nick;
+
+  const asked = prompt("댓글에 표시할 별명을 알려주세요 (12자까지)\n투표는 계속 익명이에요.");
+  if (asked == null) return null;                 // 취소
+  nick = String(asked).trim().slice(0, 12);
+  if (!nick) return null;
+  setNick(slug, nick);
+  return nick;
+}
+
+/* 숙소·맛집 목록 양쪽에 같은 방식으로 붙입니다 */
+function wireComments(listSel) {
+  const box = $(listSel);
+  if (!box || box.dataset.cmtWired) return;
+  box.dataset.cmtWired = "1";
+
+  /* 카드 자체가 "누르면 지도가 따라가는" 요소라, 댓글 안에서의
+     클릭이 거기까지 올라가면 안 됩니다 */
+  box.addEventListener("click", (ev) => {
+    if (ev.target.closest(".cmts")) ev.stopPropagation();
+  });
+
+  box.addEventListener("click", async (ev) => {
+    const del = ev.target.closest("[data-cdel]");
+    if (!del) return;
+    ev.preventDefault();
+    if (!confirm("이 댓글을 지울까요?")) return;
+    del.disabled = true;
+    try {
+      await store.commentRemove(del.dataset.cdel);
+      await refresh();
+      redrawAll();
+    } catch (e) {
+      toast(e.message || "지우지 못했어요");
+      del.disabled = false;
+    }
+  });
+
+  box.addEventListener("submit", async (ev) => {
+    const form = ev.target.closest(".cmt-form");
+    if (!form) return;
+    ev.preventDefault();
+
+    const wrap = form.closest("[data-cmt]");
+    const input = form.querySelector(".cmt-input");
+    const body = input.value.trim();
+    if (!body) return;
+
+    const nick = ensureNick();
+    if (!nick) return;
+
+    const btn = form.querySelector("button");
+    btn.disabled = true;
+    try {
+      await store.commentAdd({ targetId: wrap.dataset.cmt, body, nick });
+      input.value = "";
+      await refresh();
+      redrawAll();
+      /* 다시 그리면 접히므로, 방금 쓴 카드는 열어둡니다 */
+      const again = box.querySelector(`[data-cmt="${CSS.escape(wrap.dataset.cmt)}"]`);
+      if (again) again.open = true;
+    } catch (e) {
+      toast(e.message || "남기지 못했어요");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 
 /* ============================================================
    일정표

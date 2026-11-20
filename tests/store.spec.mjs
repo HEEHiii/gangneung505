@@ -99,7 +99,7 @@ eq(noTok, "expired", "토큰 없이 읽으면 expired");
 console.log("── 스냅샷 모양");
 const snap = await page.evaluate(() => window.st.snapshot());
 const keys = Object.keys(snap).sort().join(",");
-eq(keys, "counts,expenses,itinerary,mine,places,room,unchanged,updated_at",
+eq(keys, "comments,counts,expenses,itinerary,mine,places,room,unchanged,updated_at",
   "최상위 키가 SQL 의 room_snapshot 과 같음");
 
 eq(snap.room.title, "겨울 강릉", "방 제목");
