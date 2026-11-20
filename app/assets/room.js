@@ -711,6 +711,24 @@ function makeAdder({ slot, kind, mapKey, label }) {
           resolveShort: (u) => store.resolveShort(u),
         });
         if (r.ok) return add(r.place);
+
+        /* ★ 예약 사이트(에어비앤비 등)는 좌표를 안 알려줍니다.
+           그런데 그 사이트들이 보여주는 것도 "대략 위치" 뿐이라,
+           사용자가 그 자리를 직접 찍으면 정확도가 똑같습니다.
+           그러니 막다른 길로 두지 말고 바로 이어줍니다:
+             · 붙여넣은 링크는 '예약 링크' 칸으로 옮기고
+             · 검색칸은 비워 이름을 받을 준비를 하고
+             · 지도를 찍기 모드로 바꿉니다 */
+        if (r.pick && r.bookingUrl) {
+          if (!urlIn.value.trim()) urlIn.value = r.bookingUrl;
+          q.value = "";
+          hits.hidden = true;
+          say(r.reason);
+          startPick();
+          q.focus();
+          return;
+        }
+
         /* 짧은 링크를 서버가 못 푼 경우, 왜 그런지도 같이 보여줍니다.
            조용히 "못 찾았어요" 만 뜨면 고칠 수가 없습니다. */
         const note = store.resolveNote;
@@ -763,10 +781,10 @@ function makeAdder({ slot, kind, mapKey, label }) {
     if (e.key === "Enter") { e.preventDefault(); find(); }
   });
 
-  root.querySelector(".a-pick").addEventListener("click", () => {
+  function startPick(msg) {
     const m = maps[mapKey];
-    if (!m || !m.ok) return say("지도가 없어서 찍기를 쓸 수 없어요.", true);
-    say("지도를 눌러 위치를 정해주세요.");
+    if (!m || !m.ok) { say("지도가 없어서 찍기를 쓸 수 없어요.", true); return false; }
+    if (msg) say(msg);
     m.startPick((p) => {
       if (!p) return say("지도에서 찍기를 쓸 수 없어요.", true);
       const name = q.value.trim();
@@ -777,6 +795,11 @@ function makeAdder({ slot, kind, mapKey, label }) {
       }
       add({ name, lat: p.lat, lng: p.lng, source: "pick", approx: true });
     });
+    return true;
+  }
+
+  root.querySelector(".a-pick").addEventListener("click", () => {
+    startPick("지도를 눌러 위치를 정해주세요.");
   });
 }
 

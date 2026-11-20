@@ -312,21 +312,49 @@ function hostOf(url) {
   try { return new URL(url).hostname.toLowerCase(); } catch (_) { return ""; }
 }
 
+/* ★ 도메인을 정규식으로 느슨하게 맞추면 안 됩니다.
+
+   처음에 /airbnb\.[a-z.]+$/ 라고 썼더니 "airbnb.com.evil.io" 가
+   에어비앤비로 잡혔습니다. 여기서는 안내 문구만 바뀌는 정도지만,
+   같은 버릇으로 허용 목록을 쓰면 그게 바로 뚫리는 방식입니다.
+   (resolve-link 의 safe.js 도 같은 이유로 목록 비교를 씁니다)
+
+   그래서 "정확히 그 도메인이거나, 그 도메인으로 끝나는 하위 도메인"
+   만 인정합니다. */
+const BOOKING_SITES = [
+  "airbnb.co.kr", "airbnb.com", "abnb.me",
+  "booking.com", "agoda.com", "yanolja.com", "goodchoice.kr",
+  "expedia.co.kr", "expedia.com",
+];
+
+export function isBookingSite(url) {
+  const h = hostOf(url);
+  return BOOKING_SITES.some((d) => h === d || h.endsWith("." + d));
+}
+
 export function hintFor(url) {
   const h = hostOf(url);
 
   /* ★ 에어비앤비는 "못 하는" 게 아니라 "안 알려주는" 것입니다.
-     예약 전까지 정확한 위치를 공개하지 않고 동그라미만 보여줍니다.
-     서버가 있어도 가져올 수 없으므로, 할 수 있는 방법을 알려줍니다. */
+
+     예약 전까지 정확한 위치를 공개하지 않고 지도에 동그라미만
+     보여줍니다. 그 동그라미는 페이지 안쪽 데이터라 브라우저가
+     읽을 수 없고(CORS), 서버로 긁는 것은 차단되는 데다 남의
+     데이터를 가져오는 일입니다.
+
+     ★ 그런데 중요한 사실: 그 동그라미를 보고 사용자가 직접 찍으면
+       정확도가 똑같습니다. 어차피 동그라미니까요. 그러니 "못
+       해요"가 아니라 "그게 같은 결과예요"라고 말하는 게 맞습니다. */
   if (h.includes("airbnb") || h.includes("abnb.me")) {
-    return "에어비앤비는 예약 전까지 정확한 위치를 공개하지 않아요. "
-         + "숙소 페이지의 동네 이름이나 주소를 위 칸에 넣고, "
-         + "이 링크는 아래 '예약 링크' 칸에 넣어주세요.";
+    return "에어비앤비는 예약 전까지 정확한 위치를 안 알려주고 지도에 동그라미만 보여줘요. "
+         + "그 동그라미 자리를 아래 지도에서 직접 찍으면 정확도가 같아요. "
+         + "링크는 '예약 링크' 칸으로 옮겨뒀어요.";
   }
   if (h.includes("booking.com") || h.includes("agoda") || h.includes("yanolja")
       || h.includes("goodchoice") || h.includes("expedia")) {
     return "이 예약 사이트는 좌표를 알려주지 않아요. "
-         + "숙소 이름이나 주소를 위 칸에 넣고, 이 링크는 아래 '예약 링크' 칸에 넣어주세요.";
+         + "숙소 이름이나 주소로 찾거나, 지도에서 직접 찍어주세요. "
+         + "링크는 '예약 링크' 칸으로 옮겨뒀어요.";
   }
   if (isShortUrl(url)) {
     return "짧은 링크를 열어보지 못했어요. 이름이나 주소로 찾거나 지도에서 찍어주세요.";
@@ -401,10 +429,13 @@ export async function resolveLink(raw, opts = {}) {
     } catch (_) { /* 4단계로 */ }
   }
 
-  /* 4단계 — 직접 알려주기 */
+  /* 4단계 — 직접 알려주기.
+     예약 사이트면 "지도에서 찍기"로 바로 이어주라고 알려줍니다. */
   return {
     ok: false,
     candidates: [],
     reason: hintFor(url),
+    pick: isBookingSite(url),
+    bookingUrl: isBookingSite(url) ? url : null,
   };
 }

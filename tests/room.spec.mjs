@@ -945,6 +945,60 @@ console.log("── 맛집 지도 — 관광지에 묻히지 않기");
   await ctx.close();
 }
 
+
+/* ============================================================
+   에어비앤비 링크 — 막다른 길로 두지 않는다
+
+   ★ 에어비앤비는 예약 전까지 정확한 위치를 안 알려주고 지도에
+     동그라미만 보여줍니다. 링크에도 페이지에도 좌표가 없어서
+     서버가 있어도 못 가져옵니다.
+
+     그런데 그 동그라미를 보고 사용자가 직접 찍으면 정확도가
+     똑같습니다. 그러니 "안 돼요"로 끝내지 말고 바로 이어줘야
+     합니다 — 링크는 예약 칸으로 옮기고, 지도를 찍기 모드로.
+   ============================================================ */
+console.log("── 에어비앤비 링크");
+{
+  const { ctx, page, errors } = await fresh();
+  await openRoom(page, await makeRoom(page, { title: "에어비앤비" }));
+  await enter(page);
+
+  const AIR = "https://www.airbnb.co.kr/rooms/53302736?adults=4&check_in=2027-01-23"
+            + "&scroll_to_review=1712155966852771718";
+
+  await page.click("#adder-stay summary");
+  await page.fill("#adder-stay .a-q", AIR);
+  await page.click("#adder-stay .a-find");
+  await page.waitForTimeout(700);
+
+  const msg = await page.locator("#adder-stay .a-status").textContent();
+  ok(msg.includes("동그라미"), "왜 안 되는지, 뭐가 같은지 설명한다");
+  ok(!msg.includes("못 찾았어요"), "사용자 잘못처럼 말하지 않는다");
+
+  eq(await page.locator("#adder-stay .a-url").inputValue(), AIR,
+    "★ 붙여넣은 링크가 '예약 링크' 칸으로 옮겨진다");
+  eq(await page.locator("#adder-stay .a-q").inputValue(), "",
+    "검색칸은 비워서 이름을 받을 준비를 한다");
+  eq(await page.locator("#adder-stay .a-hits").isVisible(), false,
+    "엉뚱한 후보를 보여주지 않는다");
+
+  /* 이름을 적고 지도를 찍으면 추가된다 */
+  await page.fill("#adder-stay .a-q", "사천해변 에어비앤비");
+  /* 지도 "바탕"을 누릅니다. 좌표로 누르면 관광지 핀 위에 떨어지기
+     쉽고, 핀 클릭은 지도 클릭이 아니라 무시됩니다. */
+  await page.locator("#map-stay").dispatchEvent("click");
+  await page.waitForTimeout(800);
+
+  eq(await page.locator("#lodging-list .card").count(), 1, "지도에서 찍어 추가된다");
+  ok((await page.locator("#lodging-list").textContent()).includes("대략 위치"),
+    "대략 위치라고 솔직하게 표시한다");
+  eq(await page.locator("#lodging-list .btn-link").first().getAttribute("href"), AIR,
+    "★ 보러가기가 에어비앤비 예약 페이지로 간다");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");
