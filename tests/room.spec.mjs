@@ -726,6 +726,69 @@ console.log("── 댓글");
   await ctx.close();
 }
 
+
+/* ============================================================
+   맛집 카드를 누르면 그 자리가 확대되고, 그대로 유지되는가
+
+   ★ 실제로 있었던 버그:
+     setPoints 가 끝에서 늘 fitPoints() 를 불렀습니다. 이 함수는
+     새로고침마다 다시 도니까, 카드를 눌러 확대해 놔도 몇 초 뒤
+     폴링이 돌면 전체 보기로 튕겨 나갔습니다. 사용자 눈에는
+     "엉뚱한 곳이 확대된다"로 보입니다.
+   ============================================================ */
+console.log("── 맛집 카드 → 지도 이동");
+{
+  const { ctx, page, errors } = await fresh();
+  await openRoom(page, await makeRoom(page, { title: "지도 이동" }));
+  await enter(page);
+  await page.click('#tabs a[data-tab="food"]');
+  await page.waitForTimeout(300);
+
+  const addFood = async (name, lat, lng) => {
+    const box = "#adder-food";
+    if (!(await page.locator(`${box} .a-q`).isVisible())) {
+      await page.click(`${box} summary`);
+      await page.locator(`${box} .a-q`).waitFor({ state: "visible", timeout: 5000 });
+    }
+    await page.fill(`${box} .a-q`, `https://map.kakao.com/link/map/${name},${lat},${lng}`);
+    await page.click(`${box} .a-find`);
+    await page.waitForTimeout(700);
+  };
+  await addFood("초당순두부", 37.7956, 128.9142);
+  await addFood("주문진회센터", 37.8960, 128.8295);
+
+  const center = async () => page.evaluate(() => {
+    const m = window.__kmaps && window.__kmaps["map-food"];
+    return m ? m.__center().map((v) => v.toFixed(4)).join(",") : "지도 없음";
+  });
+  const clickCard = async (name) =>
+    page.locator("#food-list .card", { hasText: name }).locator(".card-name").click();
+
+  await clickCard("초당순두부");
+  await page.waitForTimeout(400);
+  eq(await center(), "37.7956,128.9142", "누른 맛집으로 지도가 간다");
+
+  await clickCard("주문진회센터");
+  await page.waitForTimeout(400);
+  eq(await center(), "37.8960,128.8295", "다른 카드를 누르면 그쪽으로 간다");
+
+  /* ★ 핵심: 새로고침이 돌아도 확대가 풀리지 않아야 합니다 */
+  await page.evaluate(() => window.__refreshNow && window.__refreshNow());
+  await page.waitForTimeout(600);
+  eq(await center(), "37.8960,128.8295",
+    "★ 새로고침이 돌아도 보던 자리가 유지된다 (전체 보기로 안 튕김)");
+
+  /* 같은 카드를 다시 누르면 선택이 풀립니다.
+     (스텁은 setBounds 로 중심을 바꾸지 않으므로 선택 표시로 확인합니다) */
+  await clickCard("주문진회센터");
+  await page.waitForTimeout(400);
+  eq(await page.locator("#food-list .card.sel").count(), 0,
+    "같은 카드를 다시 누르면 선택이 풀린다");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");

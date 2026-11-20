@@ -262,8 +262,14 @@ export function createMap(elId, opts = {}) {
       });
     },
 
-    /* 맛집 핀 — 이 탭에서는 주인공이라 또렷하게 */
-    setPoints(list) {
+    /* 맛집 핀 — 이 탭에서는 주인공이라 또렷하게
+
+       opts.keepView: 지금 보고 있는 화면을 건드리지 않습니다.
+       ★ 왜 필요한가: 이 함수는 새로고침마다 다시 불립니다. 끝에서
+         늘 fitPoints() 를 했더니, 사용자가 맛집 카드를 눌러 확대해
+         놓아도 몇 초 뒤 폴링이 돌면 전체 보기로 튕겨 나갔습니다.
+         사용자 눈에는 "엉뚱한 곳이 확대된다"로 보입니다. */
+    setPoints(list, opts = {}) {
       clearOvs(spotOvs);
       Object.keys(markers).forEach((k) => {
         if (markers[k].kind !== "lodging") delete markers[k];
@@ -289,7 +295,7 @@ export function createMap(elId, opts = {}) {
       });
 
       pointBounds = bboxOf(pts, 0.01);
-      if (pointBounds) api.fitPoints();
+      if (pointBounds && !opts.keepView) api.fitPoints();
     },
 
     /* 카드 클릭 → 지도 이동 */

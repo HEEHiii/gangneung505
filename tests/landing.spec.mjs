@@ -344,6 +344,72 @@ console.log("── 폼 칸 너비");
   await ctx.close();
 }
 
+
+/* ============================================================
+   테마 고르기 — 색 띠를 눌러도 글자를 눌러도 똑같이
+
+   ★ 실제로 있었던 버그:
+     숨긴 라디오에 width:0 만 줬는데, 이 묶음이 <fieldset class="field">
+     안이라 뒤에 오는 .field input{width:100%} 가 이겼습니다. 보이지
+     않는 라디오가 가로 344px 로 라벨 밖까지 뻗었고, 포커스가 가면
+     브라우저가 화면 밖으로 스크롤하려 들어 폰에서 버벅였습니다.
+     그리고 색 띠와 글자가 서로 다른 요소라 동작이 달랐습니다.
+   ============================================================ */
+console.log("── 테마 고르기 탭 영역");
+{
+  const { ctx, page, errors } = await open();
+
+  /* 숨긴 라디오가 라벨 밖으로 뻗지 않는가 */
+  const boxes = await page.evaluate(() =>
+    [...document.querySelectorAll("#f-theme .theme-opt")].map((lab) => {
+      const i = lab.querySelector("input").getBoundingClientRect();
+      const l = lab.getBoundingClientRect();
+      return { w: i.width, h: i.height, out: i.right > l.right + 1 || i.bottom > l.bottom + 1 };
+    }));
+  ok(boxes.every((b) => b.w <= 2 && b.h <= 2),
+    `숨긴 라디오가 1px 로 접혀 있다  (${boxes.map((b) => `${b.w}×${b.h}`).join(" ")})`);
+  ok(boxes.every((b) => !b.out), "숨긴 라디오가 라벨 밖으로 뻗지 않는다");
+
+  /* 색 띠 중앙을 눌렀을 때 실제로 받는 요소가 라벨인가 */
+  const hits = await page.evaluate(() =>
+    [...document.querySelectorAll("#f-theme .theme-opt")].map((lab) => {
+      const b = lab.querySelector(".swatch").getBoundingClientRect();
+      const el = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+      return el ? (el.closest(".theme-opt") === lab ? "자기 라벨" : "남의 것") : "없음";
+    }));
+  ok(hits.every((h) => h === "자기 라벨"),
+    `색 띠를 눌러도 자기 라벨이 받는다  (${hits.join(", ")})`);
+
+  /* 색 띠를 눌러서 실제로 테마가 바뀌는가 — 글자를 눌렀을 때와 같은가 */
+  const themeNow = () => page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+
+  /* ★ 좌표로 누릅니다. 색 띠는 pointer-events:none 이라 Playwright 의
+     일반 click 으로는 못 누르는데, 그게 바로 의도한 바입니다 —
+     실제 손가락은 그 자리를 눌러도 라벨이 받습니다. */
+  const tapAt = async (n, sel) => {
+    const b = await page.locator("#f-theme .theme-opt").nth(n).locator(sel).boundingBox();
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+    await page.waitForTimeout(150);
+  };
+
+  await tapAt(0, ".swatch");
+  const bySwatch = await themeNow();
+  await tapAt(2, ".swatch");
+  const other = await themeNow();
+  ok(bySwatch !== other, `색 띠 자리를 눌러 테마가 바뀐다  (${bySwatch} → ${other})`);
+
+  /* 같은 칸의 글자 자리를 눌렀을 때도 같은 결과 */
+  await tapAt(0, "span:not(.swatch)");
+  eq(await themeNow(), bySwatch, "글자 자리와 색 띠 자리의 결과가 같다");
+
+  /* 누른 뒤 화면이 옆으로 밀리지 않는가 (포커스 스크롤) */
+  const scrolled = await page.evaluate(() => window.scrollX);
+  eq(scrolled, 0, "테마를 눌러도 화면이 옆으로 밀리지 않는다");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");

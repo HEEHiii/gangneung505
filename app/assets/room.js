@@ -149,6 +149,11 @@ async function enter() {
 
   initOwner();
   startPolling();
+
+  /* 테스트가 "폴링이 한 번 돈" 상황을 기다리지 않고 만들 수 있게.
+     20초를 기다리는 테스트는 느리고, 느린 테스트는 안 돌리게 됩니다. */
+  window.__refreshNow = async () => { await refresh(); redrawAll(); };
+
   window.__roomReady = true;
 }
 
@@ -425,7 +430,12 @@ function renderFood() {
   }
 
   // 지도에는 분류와 무관하게 전부 — 맛집 탭에서는 이게 주인공입니다
-  maps.food.setPoints(all.concat(seeded.map((s) => ({ ...s, id: "seed-" + s.name }))));
+  /* 카드를 눌러 확대해 둔 상태면 화면을 건드리지 않습니다.
+     안 그러면 새로고침마다 전체 보기로 튕겨 나갑니다. */
+  maps.food.setPoints(
+    all.concat(seeded.map((s) => ({ ...s, id: "seed-" + s.name }))),
+    { keepView: !!selectedId.food }
+  );
   keepSelection("food", "#food-list", list);
   paintVotes();
 }

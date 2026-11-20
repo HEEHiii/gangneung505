@@ -37,6 +37,9 @@
     this._layer.className = "stub-layer";
     el.appendChild(this._layer);
 
+    window.__kmaps = window.__kmaps || {};
+    if (el && el.id) window.__kmaps[el.id] = this;
+
     // 테스트가 지도 클릭을 흉내 낼 수 있게
     el.addEventListener("click", (e) => {
       if (e.__stubPin) return;                 // 핀 클릭은 지도 클릭이 아님
@@ -54,6 +57,12 @@
   KMap.prototype.setBounds = function (b) { this._bounds = b; };
   KMap.prototype.relayout = function () { this._relayouts++; };
   KMap.prototype.getNode = function () { return this._el; };
+
+  /* 테스트가 "지도가 어디를 보고 있나"를 잴 수 있게 꺼내 둡니다.
+     실제 카카오 SDK 에는 없는, 이 스텁만의 통로입니다. */
+  KMap.prototype.__center = function () {
+    return this._center ? [this._center.getLat(), this._center.getLng()] : null;
+  };
 
   function CustomOverlay(opts) {
     this._pos = opts.position;
