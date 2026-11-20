@@ -204,16 +204,41 @@ export const LOGIN_PROVIDER = "google";   // "github" | "kakao"
 Supabase 왼쪽 메뉴 **Edge Functions** → **Deploy a new function** →
 **Via Editor** (브라우저에서 바로 쓰는 방식)
 
-- 이름: **`resolve-link`** ← 글자 하나까지 똑같아야 합니다
-- 편집기 내용을 전부 지우고,
-  [`index.ts`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/functions/resolve-link/index.ts)
-  와 [`safe.js`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/functions/resolve-link/safe.js)
-  **두 파일**을 각각 같은 이름으로 만들어 붙여넣기
+- 이름은 아무거나 괜찮습니다 (나중에 설정에 적어줍니다)
+- **편집기에 있던 예제 코드를 전부 지우고**,
+  [**`bundled.ts`**](https://github.com/HEEHiii/gangneung505/blob/main/supabase/functions/resolve-link/bundled.ts)
+  내용을 통째로 붙여넣기 — **한 파일이면 됩니다**
 - **Deploy**
 
-> 편집기에서 파일을 두 개 만들 수 없으면, `safe.js` 내용을 `index.ts`
-> 맨 위에 붙여넣고 `import { … } from "./safe.js";` 줄을 지우세요.
-> 같은 코드라 결과는 같습니다.
+> ⚠️ **기본 예제 코드를 꼭 지우세요.** 안 지우면 함수는 올라가지만
+> `Hello undefined` 만 돌려줍니다. 실제로 이것 때문에 한참 헤맸습니다.
+
+### 2-1) 함수의 진짜 이름 확인
+
+올린 뒤 그 함수를 열고 **주소창**을 보세요:
+
+```
+.../functions/여기가-진짜-이름/details
+```
+
+`app/assets/config.js` 의 `RESOLVE_FN` 에 그 이름을 적습니다.
+
+> Supabase 는 **한 번 정한 함수 이름을 못 바꿉니다.** 설정 화면의
+> `Name` 을 고쳐도 "slug and endpoint URL will remain the same" 이라고
+> 쓰여 있듯 **주소는 그대로**입니다. 그래서 이름을 맞추는 대신
+> 설정 한 줄을 고치는 쪽이 쉽습니다.
+
+### 2-2) Verify JWT 끄기
+
+같은 화면 **Settings → Verify JWT with legacy secret → 끄기**
+
+> 꺼도 안전합니다. 실제로 막는 건 **방 토큰 확인**(데이터베이스가
+> 합니다)과 **허용 사이트 목록**, **한 방 시간당 20번** 제한입니다.
+> JWT 검사는 "로그인한 사람인가"만 보는데, 우리 친구들은 애초에
+> 로그인을 하지 않습니다.
+>
+> 켜두면 브라우저의 사전 확인 요청(OPTIONS)이 막혀서, **함수가
+> 실행조차 안 되고 로그도 안 남습니다.**
 
 ### 3) 확인
 

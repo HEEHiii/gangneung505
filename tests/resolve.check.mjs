@@ -11,6 +11,10 @@
 
 import { hostAllowed, safeUrl, coordsFrom, nameFrom, inKorea }
   from "../supabase/functions/resolve-link/safe.js";
+import { buildBundle } from "../tools/build-resolve.mjs";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 let fails = 0;
 const ok = (cond, what) => {
@@ -94,6 +98,28 @@ eq(nameFrom("https://naver.me/x"), "", "이름이 없으면 빈 문자열");
 ok(nameFrom("https://map.naver.com/?title=" + "가".repeat(200)).length <= 60,
   "아무리 길어도 60자로 자른다");
 eq(nameFrom("https://map.naver.com/?title=%E0%A4%A"), "", "깨진 글자여도 터지지 않는다");
+
+/* ============================================================
+   3. 붙여넣기용 한 파일이 최신인가
+
+   ★ Supabase 편집기에서는 파일 여러 개를 만들기 번거로워서,
+     safe.js + index.ts 를 합친 bundled.ts 를 따로 둡니다.
+     사본은 반드시 낡습니다 — 한쪽만 고치고 다른 쪽을 잊으면,
+     그 어긋남은 배포한 뒤에야 드러납니다. 그래서 지금 다시
+     만들어 보고 커밋된 것과 같은지 확인합니다.
+   ============================================================ */
+console.log("── 붙여넣기용 파일");
+{
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const file = join(HERE, "..", "supabase", "functions", "resolve-link", "bundled.ts");
+  let saved = "";
+  try { saved = readFileSync(file, "utf8"); } catch (_) {}
+  ok(saved === buildBundle(),
+    "bundled.ts 가 최신이다 (낡았으면: node tools/build-resolve.mjs)");
+  ok(saved.includes("Deno.serve"), "bundled.ts 에 진입점이 들어 있다");
+  ok(!saved.includes('from "./safe.js"'), "bundled.ts 에 다른 파일을 부르는 줄이 없다");
+  ok(saved.includes("hostAllowed"), "bundled.ts 에 안전장치가 들어 있다");
+}
 
 console.log("");
 if (fails === 0) console.log("전부 통과");
