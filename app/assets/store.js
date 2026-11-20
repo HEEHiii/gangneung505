@@ -17,7 +17,7 @@
    ============================================================ */
 
 import { rpc, RpcError } from "./supa.js";
-import { hasBackend, SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
+import { hasBackend, SUPABASE_URL, SUPABASE_ANON_KEY, RESOLVE_FN } from "./config.js";
 import { voterKey, newId } from "./session.js";
 
 const LOCAL_TOKEN = "local-mode";
@@ -549,7 +549,7 @@ export function createStore(slug) {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), 8000);
       try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/resolve-link`, {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/${RESOLVE_FN}`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -567,13 +567,14 @@ export function createStore(slug) {
            403(토큰·횟수) 은 상황이 바뀔 수 있으므로 계속 시도합니다. */
         if (res.status === 404) {
           resolveOff = true;
-          lastResolveNote = "링크 풀기 기능이 아직 안 올라갔어요 (resolve-link 미배포)";
+          lastResolveNote = `링크 풀기 함수 "${RESOLVE_FN}" 를 찾지 못했어요 `
+                          + "(Supabase 주소창의 /functions/<이름>/details 와 맞는지 확인해주세요)";
           return null;
         }
         if (res.status === 401) {
           resolveOff = true;
           lastResolveNote = "링크 풀기 기능이 막혀 있어요 "
-                          + "(Edge Functions → resolve-link → Verify JWT 를 꺼주세요)";
+                          + `(Edge Functions → ${RESOLVE_FN} → Verify JWT 를 꺼주세요)`;
           return null;
         }
         if (res.status >= 500) {
@@ -593,7 +594,7 @@ export function createStore(slug) {
         lastResolveNote = (e && e.name === "AbortError")
           ? "링크 풀기가 너무 오래 걸려요"
           : "링크 풀기 서버에 닿지 못했어요 "
-            + "(resolve-link 의 Verify JWT 를 끄거나 함수 이름을 확인해주세요)";
+            + `(${RESOLVE_FN} 의 Verify JWT 를 끄거나 함수 이름을 확인해주세요)`;
         return null;
       } finally {
         clearTimeout(timer);

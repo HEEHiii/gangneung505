@@ -46,6 +46,7 @@ const KEY = read("SUPABASE_ANON_KEY");
 const KAKAO = read("KAKAO_JS_KEY");
 const R2 = read("R2_PUBLIC_BASE");
 const PROVIDER = read("LOGIN_PROVIDER");
+const RESOLVE_FN = read("RESOLVE_FN");
 
 console.log("── 네 줄이 제자리에 있는지");
 for (const [n, v] of [["SUPABASE_URL", URL_], ["SUPABASE_ANON_KEY", KEY],
@@ -96,6 +97,13 @@ if (PROVIDER === "kakao") {
   console.log("  참고   카카오는 비즈앱 전환이 끝난 뒤에만 됩니다 (KOE205)");
 }
 
+/* ---------- 1-3. 링크 풀기 함수 이름 ---------- */
+console.log("── 짧은 링크 풀기");
+if (RESOLVE_FN !== null) {
+  ok(/^[a-z0-9][a-z0-9-]{0,40}$/.test(RESOLVE_FN),
+    `RESOLVE_FN 이 Supabase 함수 이름 모양  (${JSON.stringify(RESOLVE_FN)})`);
+}
+
 /* ---------- 2. 반쪽만 채운 상태 ---------- */
 console.log("── 반쪽만 채워서 조용히 꺼지지 않는지");
 ok(!!URL_ === !!KEY,
@@ -121,6 +129,7 @@ console.log(`  저장   ${URL_ && KEY ? "Supabase 서버 (친구와 합쳐짐)" 
 console.log(`  지도   ${KAKAO ? "카카오 지도" : "안내판으로 대체"}`);
 console.log(`  갤러리 ${R2 ? "켜짐" : "숨김 (3단계)"}`);
 console.log(`  로그인 ${PROVIDER}`);
+console.log(`  링크풀기 ${RESOLVE_FN}`);
 
 console.log("");
 if (fails === 0) console.log("전부 통과");
