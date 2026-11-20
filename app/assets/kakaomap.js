@@ -278,20 +278,34 @@ export function createMap(elId, opts = {}) {
       const pts = [];
       (list || []).forEach((s) => {
         if (s.lat == null || s.lng == null) return;
-        const node = pinEl(foodHtml(s.kind || s.cat, s.name), () => {
-          openBubble(s.lat, s.lng,
-            `<strong>${esc(s.name)}</strong>` +
-            (s.note ? `<br><span class="sub">${esc(s.note)}</span>` : "") +
-            (s.approx ? `<br><span class="sub">※ 대략 위치</span>` : ""));
-        });
+
+        /* ★ 우리가 깔아준 지역 관광지는 조용하게 그립니다.
+
+           전에는 관광지도 식당과 똑같은 크기·이름표로 그렸습니다.
+           강릉이면 관광지만 열댓 개라, 직접 추가한 식당 두세 곳이
+           그 사이에 묻혀 보이지 않았습니다. 주인공은 "친구들이 모은
+           곳"이고 관광지는 배경입니다. */
+        const quiet = !!s.seeded;
+        const node = pinEl(
+          quiet ? spotHtml(s.name) : foodHtml(s.kind || s.cat, s.name),
+          () => {
+            openBubble(s.lat, s.lng,
+              `<strong>${esc(s.name)}</strong>` +
+              (s.note ? `<br><span class="sub">${esc(s.note)}</span>` : "") +
+              (s.approx ? `<br><span class="sub">※ 대략 위치</span>` : ""));
+          });
         const ov = new K.CustomOverlay({
           position: ll(s.lat, s.lng), content: node,
-          yAnchor: 1, zIndex: 2, clickable: true,
+          yAnchor: quiet ? 0.5 : 1, zIndex: quiet ? 1 : 3, clickable: true,
         });
         ov.setMap(map);
         spotOvs.push(ov);
         markers[s.id] = { ov, el: node, no: 0, lat: s.lat, lng: s.lng, kind: s.kind || s.cat };
-        pts.push({ lat: s.lat, lng: s.lng });
+
+        /* ★ 지도 범위는 직접 추가한 곳에만 맞춥니다.
+           관광지까지 넣으면 지역 전체로 확 줄어들어, 정작 보고 싶은
+           식당들이 깨알만 해집니다. */
+        if (!quiet) pts.push({ lat: s.lat, lng: s.lng });
       });
 
       pointBounds = bboxOf(pts, 0.01);

@@ -17,7 +17,7 @@
    ============================================================ */
 
 import { rpc, RpcError } from "./supa.js";
-import { hasBackend } from "./config.js";
+import { hasBackend, SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { voterKey, newId } from "./session.js";
 
 const LOCAL_TOKEN = "local-mode";
@@ -211,6 +211,8 @@ export async function deleteRoom(slug) {
    방 하나를 다루는 꾸러미
    ============================================================ */
 export function createStore(slug) {
+  /* Edge Function 이 없는 환경이면 한 번 겪고 그만둡니다 */
+  let resolveOff = false;
   const voter = voterKey(slug);
   const online = hasBackend();
   let token = null;
@@ -523,6 +525,40 @@ export function createStore(slug) {
         return { ok: true };
       }
       return await rpc("comment_remove", { p_token: need(), p_voter: voter, p_id: id });
+    },
+
+    /* ---------- 짧은 링크 풀기 ----------
+
+       naver.me 같은 짧은 주소는 열어봐야 진짜 주소를 알 수 있는데,
+       브라우저는 남의 사이트의 Location 헤더를 못 읽습니다(CORS).
+       그래서 작은 서버 조각(Edge Function)이 대신 따라가 줍니다.
+
+       ★ 배포 안 돼 있어도 괜찮습니다.
+         한 번 불러보고 안 되면 이번 방문 동안 다시 시도하지 않고,
+         화면은 "이름으로 검색 / 지도에서 찍기" 로 degrade 합니다.
+         매번 404 를 기다리면 사용자만 답답해집니다. */
+    async resolveShort(url) {
+      if (!online || resolveOff) return null;
+      const token = need();
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/resolve-link`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            apikey: SUPABASE_ANON_KEY,
+            authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ token, url }),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (res.status === 404 || res.status === 501) { resolveOff = true; return null; }
+        const got = await res.json();
+        if (got && got.ok) return { lat: got.lat, lng: got.lng, name: got.name || "" };
+        return null;
+      } catch (_) {
+        resolveOff = true;        /* 네트워크 자체가 안 되면 더 조르지 않습니다 */
+        return null;
+      }
     },
 
     /* ---------- 아직 쓰는 방이라고 표시 ---------- */

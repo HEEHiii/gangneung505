@@ -39,6 +39,7 @@ step "순수 함수"         node tests/util.check.mjs
 step "정산 계산"         node tests/settle.check.mjs
 step "일정 짜기"         node tests/route.check.mjs
 step "링크 파싱"         node tests/places.check.mjs
+step "링크 풀기 안전장치" node tests/resolve.check.mjs
 step "RPC 계약"          node tests/rpc-contract.check.mjs
 
 if [ -x /usr/lib/postgresql/16/bin/initdb ] || [ -n "${PGBIN:-}" ]; then

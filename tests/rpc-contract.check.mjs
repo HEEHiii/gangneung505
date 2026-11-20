@@ -116,6 +116,19 @@ console.log("");
    1. 양쪽 목록이 같은가
    ============================================================ */
 console.log("── 함수 목록");
+
+/* ★ 브라우저가 아니라 서버 조각(Edge Function)이 부르는 함수들.
+
+   supa.js 의 RPC 표는 "브라우저가 부르는 것" 목록입니다. 여기 것들은
+   Edge Function 이 서버에서 부르므로 그 표에 없는 게 맞습니다.
+   그래도 anon 에 GRANT 는 되어 있어야 합니다 — Edge Function 이
+   anon 키로 부르니까요.
+
+   이 목록에 적지 않고 그냥 넘어가게 만들면, 나중에 쓰지 않는 함수가
+   열린 채 남아도 아무도 모르게 됩니다. 그래서 예외는 "여기 적은
+   것만" 으로 못박습니다. */
+const SERVER_ONLY = new Set(["resolve_allow"]);
+
 const jsNames = Object.keys(RPC).sort();
 const sqlNames = Object.keys(sqlFns).sort();
 
@@ -123,6 +136,10 @@ for (const n of jsNames) {
   ok(sqlNames.includes(n), `supa.js 의 ${n} 가 SQL 에 있음`);
 }
 for (const n of sqlNames) {
+  if (SERVER_ONLY.has(n)) {
+    ok(true, `SQL 의 ${n} 는 서버 조각 전용 (브라우저는 안 부름)`);
+    continue;
+  }
   ok(jsNames.includes(n), `SQL 의 ${n} 가 supa.js 에 있음`);
 }
 
@@ -162,6 +179,10 @@ for (const n of jsNames) {
 /* GRANT 는 있는데 supa.js 가 모르는 함수 — 열어둘 생각이 없었던 것일 수 있습니다 */
 console.log("── 의도하지 않은 공개");
 for (const n of Object.keys(grants)) {
+  if (SERVER_ONLY.has(n)) {
+    ok(true, `GRANT 된 ${n} 는 서버 조각이 씁니다 (의도한 공개)`);
+    continue;
+  }
   ok(jsNames.includes(n),
     `GRANT 된 ${n} 가 supa.js 에도 있음${jsNames.includes(n) ? "" : "  ← 쓰지 않는데 열려 있습니다"}`);
 }

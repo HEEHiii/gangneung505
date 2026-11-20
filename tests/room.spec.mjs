@@ -871,6 +871,80 @@ console.log("── 주소로 추가 · 예약 링크");
   await ctx.close();
 }
 
+
+/* ============================================================
+   맛집 지도에서 식당이 묻히지 않는가
+
+   ★ 사장님 말: "관광지 때문에 식당이 어디 있는지 잘 안 보여"
+
+     원인이 셋이었다. 관광지를 식당과 똑같은 크기·이름표로 그렸고,
+     지도 범위를 관광지까지 포함해 맞춰서 식당들이 깨알만 해졌고,
+     위의 필터가 목록만 거르고 지도는 그대로 뒀다.
+   ============================================================ */
+console.log("── 맛집 지도 — 관광지에 묻히지 않기");
+{
+  const SEED = [
+    { place_name: "경포대", x: "128.8963", y: "37.7955", address_name: "강릉" },
+    { place_name: "오죽헌", x: "128.8783", y: "37.7792", address_name: "강릉" },
+    { place_name: "정동진", x: "129.0335", y: "37.6908", address_name: "강릉" },
+  ];
+  const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
+  await stubConfig(ctx, { KAKAO_JS_KEY: "0".repeat(32) });
+  await ctx.addInitScript({ content: STUB });
+  await ctx.addInitScript({ content:
+    `window.__stubPlaces = ${JSON.stringify({ category: { AT4: SEED } })};` });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+
+  await openRoom(page, await makeRoom(page, { title: "지도 정리" }));
+  await enter(page);
+  await page.click('#tabs a[data-tab="food"]');
+  await page.waitForTimeout(500);
+
+  const addFood = async (name, lat, lng) => {
+    const box = "#adder-food";
+    if (!(await page.locator(`${box} .a-q`).isVisible())) {
+      await page.click(`${box} summary`);
+      await page.locator(`${box} .a-q`).waitFor({ state: "visible", timeout: 5000 });
+    }
+    await page.fill(`${box} .a-q`, `https://map.kakao.com/link/map/${name},${lat},${lng}`);
+    await page.click(`${box} .a-find`);
+    await page.waitForTimeout(700);
+  };
+  await addFood("초당순두부", 37.7956, 128.9142);
+
+  const pins = () => page.evaluate(() => {
+    const layer = document.querySelector("#map-food .stub-layer");
+    const nodes = [...(layer ? layer.children : [])];
+    return {
+      식당: nodes.filter((n) => n.querySelector(".pin-food")).length,
+      관광지: nodes.filter((n) => n.querySelector(".pin-spot")).length,
+      큰이름표: nodes.filter((n) => n.querySelector(".pin-label:not(.sm)")).length,
+    };
+  });
+
+  const before = await pins();
+  ok(before.식당 >= 1, `직접 추가한 식당이 또렷한 핀으로 뜸  (${before.식당}개)`);
+  ok(before.관광지 >= 1, `관광지도 같이 뜸  (${before.관광지}개)`);
+  eq(before.큰이름표, before.식당,
+    "★ 큰 이름표는 직접 추가한 곳에만 (관광지는 작은 글씨로 물러남)");
+
+  /* 필터가 지도에도 걸리는가 */
+  await page.click('#food-filters [data-cat="food"]');
+  await page.waitForTimeout(400);
+  const onlyFood = await pins();
+  eq(onlyFood.관광지, 0, "★ '식당'을 누르면 지도에서도 관광지가 사라진다");
+  ok(onlyFood.식당 >= 1, "식당은 그대로 남는다");
+
+  await page.click('#food-filters [data-cat="all"]');
+  await page.waitForTimeout(400);
+  ok((await pins()).관광지 >= 1, "'전부'로 되돌리면 관광지가 다시 보인다");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");

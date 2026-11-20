@@ -431,12 +431,19 @@ function renderFood() {
   }
 
   // 지도에는 분류와 무관하게 전부 — 맛집 탭에서는 이게 주인공입니다
+  /* ★ 위의 필터는 목록만이 아니라 지도에도 겁니다.
+
+     전에는 목록만 걸러서, "식당"을 눌러도 지도에는 카페·관광지가
+     그대로 떠 있었습니다. 보고 싶은 것만 보려고 누른 건데요.
+     관광지는 "전부" 나 "관광" 일 때만 깔아둡니다. */
+  const showSeeded = foodCat === "all" || foodCat === "spot";
+  const onMap = list.concat(
+    showSeeded ? seeded.map((s) => ({ ...s, id: "seed-" + s.name, seeded: true })) : []
+  );
+
   /* 카드를 눌러 확대해 둔 상태면 화면을 건드리지 않습니다.
      안 그러면 새로고침마다 전체 보기로 튕겨 나갑니다. */
-  maps.food.setPoints(
-    all.concat(seeded.map((s) => ({ ...s, id: "seed-" + s.name }))),
-    { keepView: !!selectedId.food }
-  );
+  maps.food.setPoints(onMap, { keepView: !!selectedId.food });
   keepSelection("food", "#food-list", list);
   paintVotes();
 }
@@ -699,7 +706,9 @@ function makeAdder({ slot, kind, mapKey, label }) {
       if (/^https?:\/\//i.test(v)) {
         const r = await resolveLink(v, {
           bbox: regionBbox(), kind: pickedKind(),
-          resolveShort: null,          // Edge Function 은 아직 없습니다 (1·3·4단계로 degrade)
+          /* 짧은 링크(naver.me 등)는 서버 조각이 대신 따라가 줍니다.
+             배포 안 돼 있으면 조용히 3·4단계로 내려갑니다. */
+          resolveShort: (u) => store.resolveShort(u),
         });
         if (r.ok) return add(r.place);
         return showHits(r.candidates, r.reason);

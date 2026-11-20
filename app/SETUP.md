@@ -183,6 +183,61 @@ export const LOGIN_PROVIDER = "google";   // "github" | "kakao"
 
 ---
 
+## 선택 — 짧은 링크 자동으로 풀기
+
+`naver.me` 같은 **짧은 주소**를 붙여넣어도 위치를 찾아주게 하는 기능입니다.
+**안 해도 됩니다** — 안 하면 지금처럼 "이름으로 검색 / 주소 붙여넣기 /
+지도에서 찍기" 로 동작합니다.
+
+> **왜 서버가 필요한가**: 짧은 주소는 열어봐야 진짜 주소를 알 수 있는데,
+> 브라우저는 보안상 남의 사이트의 응답 헤더를 읽을 수 없습니다.
+> 그래서 작은 서버 조각이 대신 따라가 줍니다. 페이지 내용은 받지 않고
+> **"어디로 넘어가는지"만** 봅니다.
+
+### 1) 표 하나 더 만들기
+
+[`0007_resolve.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0007_resolve.sql)
+을 SQL Editor 에 붙여넣고 Run.
+
+### 2) 함수 올리기
+
+Supabase 왼쪽 메뉴 **Edge Functions** → **Deploy a new function** →
+**Via Editor** (브라우저에서 바로 쓰는 방식)
+
+- 이름: **`resolve-link`** ← 글자 하나까지 똑같아야 합니다
+- 편집기 내용을 전부 지우고,
+  [`index.ts`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/functions/resolve-link/index.ts)
+  와 [`safe.js`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/functions/resolve-link/safe.js)
+  **두 파일**을 각각 같은 이름으로 만들어 붙여넣기
+- **Deploy**
+
+> 편집기에서 파일을 두 개 만들 수 없으면, `safe.js` 내용을 `index.ts`
+> 맨 위에 붙여넣고 `import { … } from "./safe.js";` 줄을 지우세요.
+> 같은 코드라 결과는 같습니다.
+
+### 3) 확인
+
+숙소 추가 칸에 `naver.me/...` 링크를 붙여넣고 **찾기**.
+바로 지도에 뜨면 성공입니다.
+
+안 되면 그냥 두셔도 됩니다 — **한 번 실패하면 그 뒤로는 시도하지 않고**
+이름 검색·주소 붙여넣기로 조용히 넘어갑니다.
+
+### 안전장치
+
+이 함수는 주소만 알면 누구나 부를 수 있어서, 막아두지 않으면 **아무
+주소나 대신 긁어주는 서버**가 됩니다. 그래서:
+
+- 진짜 방 토큰이 있어야 하고, 한 방에 **한 시간 20번**까지
+- **허용한 사이트**(네이버·카카오·구글 지도)만
+- IP 를 직접 적은 주소, 사설망, `localhost`, `file://` 전부 거부
+- 3초 넘으면 포기, 넘어가기는 4번까지
+- 돌려주는 건 **좌표와 이름뿐** — 페이지 내용은 절대 안 보냄
+
+일부러 공격해보는 검사 20여 가지가 `tests/resolve.check.mjs` 에 있습니다.
+
+---
+
 ## 흔한 실수 세 가지
 
 | 틀리기 쉬운 것 | 맞는 것 | 증상 |

@@ -770,6 +770,53 @@ select pg_temp.ok((select count(*) from app.comments where deleted_at is null) =
 
 
 -- ============================================================
+--  9.8 짧은 링크 풀기 허가
+--
+--  ★ Edge Function 은 주소만 알면 누구나 부를 수 있습니다.
+--    막지 않으면 "아무 주소나 대신 긁어주는 서버"가 됩니다.
+--    그 판단을 여기(SQL)에 둔 이유가 바로 이 테스트입니다.
+-- ============================================================
+\echo '── 9.8 링크 풀기 허가'
+reset role;
+set role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', false);
+
+insert into t select 'ra1', (public.resolve_allow(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b')))::text;
+insert into t select 'ra2', (public.resolve_allow('가짜토큰입니다가짜토큰입니다가짜'))::text;
+
+reset role;
+select pg_temp.ok((select v::jsonb ->> 'ok' from t where k = 'ra1') = 'true',
+  '진짜 방 토큰이면 허용');
+select pg_temp.ok((select v::jsonb ->> 'ok' from t where k = 'ra2') = 'false',
+  '가짜 토큰이면 거부');
+select pg_temp.ok((select v::jsonb ->> 'code' from t where k = 'ra2') = 'expired',
+  '거부 이유를 알려줌');
+
+-- 20번을 넘기면 잠깐 멈춰야 합니다
+set role anon;
+do $$
+declare
+  v_tok text := (select v::jsonb ->> 'token' from t where k = 'tok1b');
+  v_r jsonb; i int;
+begin
+  for i in 1..25 loop
+    v_r := public.resolve_allow(v_tok);
+  end loop;
+  if (v_r ->> 'ok') = 'false' and (v_r ->> 'code') = 'rate' then
+    raise notice '  OK    한 시간에 20번을 넘기면 잠깐 멈춤';
+  else
+    raise exception 'FAIL: 25번을 불러도 안 막혔습니다 (%)', v_r;
+  end if;
+end $$;
+
+reset role;
+select pg_temp.ok(
+  (select count(*) from app.rate_events where bucket = 'resolve') between 1 and 25,
+  '★ 횟수가 실제로 쌓인다 (예외를 던졌다면 0 이었을 것)');
+
+
+-- ============================================================
 --  10. 방 삭제는 자식까지 함께
 -- ============================================================
 \echo '── 10. 방 삭제'
