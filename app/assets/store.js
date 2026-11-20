@@ -211,8 +211,11 @@ export async function deleteRoom(slug) {
    방 하나를 다루는 꾸러미
    ============================================================ */
 export function createStore(slug) {
-  /* Edge Function 이 없는 환경이면 한 번 겪고 그만둡니다 */
+  /* Edge Function 이 없는 환경이면 한 번 겪고 그만둡니다.
+     lastResolveNote 는 "왜 안 됐는지" 를 화면에 보여주기 위한 것입니다 —
+     그냥 조용히 실패하면 사장님도 저도 원인을 알 수가 없습니다. */
   let resolveOff = false;
+  let lastResolveNote = "";
   const voter = voterKey(slug);
   const online = hasBackend();
   let token = null;
@@ -537,9 +540,12 @@ export function createStore(slug) {
          한 번 불러보고 안 되면 이번 방문 동안 다시 시도하지 않고,
          화면은 "이름으로 검색 / 지도에서 찍기" 로 degrade 합니다.
          매번 404 를 기다리면 사용자만 답답해집니다. */
+    get resolveNote() { return lastResolveNote; },
+
     async resolveShort(url) {
       if (!online || resolveOff) return null;
       const token = need();
+      lastResolveNote = "";
       try {
         const res = await fetch(`${SUPABASE_URL}/functions/v1/resolve-link`, {
           method: "POST",
@@ -554,15 +560,29 @@ export function createStore(slug) {
         /* 404(배포 안 됨) · 401(JWT 검사에 막힘) 처럼 "설정 문제"는
            다시 시도해도 똑같습니다. 한 번 겪으면 그만둡니다.
            403(토큰·횟수) 은 상황이 바뀔 수 있으므로 계속 시도합니다. */
-        if (res.status === 404 || res.status === 401 || res.status >= 500) {
+        if (res.status === 404) {
           resolveOff = true;
+          lastResolveNote = "링크 풀기 기능이 아직 안 올라갔어요 (resolve-link 미배포)";
           return null;
         }
-        const got = await res.json();
+        if (res.status === 401) {
+          resolveOff = true;
+          lastResolveNote = "링크 풀기 기능이 막혀 있어요 "
+                          + "(Edge Functions → resolve-link → Verify JWT 를 꺼주세요)";
+          return null;
+        }
+        if (res.status >= 500) {
+          resolveOff = true;
+          lastResolveNote = `링크 풀기 서버에 문제가 있어요 (${res.status})`;
+          return null;
+        }
+        const got = await res.json().catch(() => null);
         if (got && got.ok) return { lat: got.lat, lng: got.lng, name: got.name || "" };
+        lastResolveNote = (got && got.message) || `링크를 풀지 못했어요 (${res.status})`;
         return null;
-      } catch (_) {
+      } catch (e) {
         resolveOff = true;        /* 네트워크 자체가 안 되면 더 조르지 않습니다 */
+        lastResolveNote = "링크 풀기 서버에 연결하지 못했어요";
         return null;
       }
     },

@@ -711,7 +711,10 @@ function makeAdder({ slot, kind, mapKey, label }) {
           resolveShort: (u) => store.resolveShort(u),
         });
         if (r.ok) return add(r.place);
-        return showHits(r.candidates, r.reason);
+        /* 짧은 링크를 서버가 못 푼 경우, 왜 그런지도 같이 보여줍니다.
+           조용히 "못 찾았어요" 만 뜨면 고칠 수가 없습니다. */
+        const note = store.resolveNote;
+        return showHits(r.candidates, note ? `${r.reason} (${note})` : r.reason);
       }
 
       // 좌표를 그대로 붙여넣는 사람도 있습니다
