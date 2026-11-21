@@ -1040,6 +1040,8 @@ console.log("── 사진 갤러리");
   await page.waitForTimeout(400);
   eq(await page.locator("#photo-view").isVisible(), true, "누르면 크게 보인다");
   eq(await page.locator("#photo-del").isVisible(), true, "내가 올린 사진은 지울 수 있다");
+  eq(await page.locator("#photo-save").isVisible(), true,
+    "사진을 폰에 저장할 수 있다 (주소는 못 넘겨도 사진은 받을 수 있어야 합니다)");
 
   /* 사진에 댓글 */
   let asked = 0;
@@ -1076,6 +1078,55 @@ console.log("── 사진 갤러리");
 
   eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
   await ctx.close();
+}
+
+
+/* ============================================================
+   사진 — 여행 중에는 더 강하게 말린다
+
+   ★ "우리가 지금 여기 있다"가 위험한 것이지, 다녀온 뒤 사진은
+     추억입니다. 그래서 끝난 날짜를 보고 문구를 바꿉니다.
+     안내를 늘 똑같이 띄우면 아무도 안 읽습니다.
+   ============================================================ */
+console.log("── 사진 — 여행 중 경고");
+{
+  const future = (days) => {
+    const d = new Date(Date.now() + days * 86400000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const past = (days) => future(-days);
+
+  /* 아직 안 끝난 여행 */
+  {
+    const { ctx, page } = await fresh();
+    await openRoom(page, await makeRoom(page, {
+      title: "다가오는 여행", start: future(10), end: future(12),
+    }));
+    await enter(page);
+    await page.click('#tabs a[data-tab="photo"]');
+    await page.waitForTimeout(500);
+    const w = await page.locator("#photo-warn").textContent();
+    ok(w.includes("여행이 끝난 뒤에"), "여행 전에는 '끝난 뒤에 올리세요'");
+    ok(w.includes("지금 어디에 있는지"), "왜 그런지도 말해준다");
+    ok(await page.locator("#photo-warn.strong").count() === 1, "눈에 띄게 표시된다");
+    await ctx.close();
+  }
+
+  /* 이미 끝난 여행 */
+  {
+    const { ctx, page } = await fresh();
+    await openRoom(page, await makeRoom(page, {
+      title: "다녀온 여행", start: past(12), end: past(10),
+    }));
+    await enter(page);
+    await page.click('#tabs a[data-tab="photo"]');
+    await page.waitForTimeout(500);
+    const w = await page.locator("#photo-warn").textContent();
+    ok(!w.includes("여행이 끝난 뒤에"), "다녀온 뒤에는 그 말을 안 한다");
+    ok(w.includes("누구나 볼 수 있어요"), "대신 공유 범위는 계속 알려준다");
+    eq(await page.locator("#photo-warn.strong").count(), 0, "경고 수위가 낮아진다");
+    await ctx.close();
+  }
 }
 
 await browser.close();

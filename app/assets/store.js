@@ -18,7 +18,7 @@
 
 import { rpc, RpcError } from "./supa.js";
 import { hasBackend, SUPABASE_URL, SUPABASE_ANON_KEY, RESOLVE_FN,
-         R2_PUBLIC_BASE, PHOTO_FN, hasGallery } from "./config.js";
+         PHOTO_FN } from "./config.js";
 import { voterKey, newId } from "./session.js";
 
 const LOCAL_TOKEN = "local-mode";
@@ -218,6 +218,9 @@ export function createStore(slug) {
      그냥 조용히 실패하면 사장님도 저도 원인을 알 수가 없습니다. */
   let resolveOff = false;
   let lastResolveNote = "";
+
+  /* 사진 보관함이 연결돼 있는지. null = 아직 안 물어봄 */
+  let galleryReady = null;
   const voter = voterKey(slug);
   const online = hasBackend();
   let token = null;
@@ -621,29 +624,59 @@ export function createStore(slug) {
          설정 전에도 화면을 다 눌러볼 수 있어야 합니다. */
     async photoList() {
       need();
-      if (!online) {
-        const box = lread(slug);
-        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
-        const alive = (box.photos || []).filter((p) => !p.deleted_at);
-        return {
-          photos: alive.map((p) => ({ ...p, mine: p.created_by === voter })),
-          comments: (box.comments || [])
-            .filter((c) => !c.deleted_at && c.target_type === "photo")
-            .map((c) => ({
-              id: c.id, target_id: c.target_id, body: c.body, nick: c.nick,
-              mine: c.voter_key === voter, created_at: c.created_at,
-            })),
-          cap: 300, used: alive.length, local: true,
-        };
+
+      /* ★ 서버 모드면 Edge Function 에 물어봅니다.
+         그 함수가 DB 에서 "이 방의 사진"만 꺼내 한 시간짜리 주소를
+         붙여 돌려줍니다. 어떤 사진의 주소를 내줄지 DB 가 정하므로,
+         남의 방 사진 주소를 달라고 할 방법이 없습니다. */
+      if (online && galleryReady !== false) {
+        try {
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/${PHOTO_FN}`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              apikey: SUPABASE_ANON_KEY,
+              authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({ mode: "view", token: need() }),
+          });
+          if (res.ok) {
+            const got = await res.json();
+            if (got && got.ok) {
+              galleryReady = true;
+              return { ...got, local: false };
+            }
+          }
+          /* 503(열쇠 없음)·404(함수 없음)이면 연결 안 된 것입니다 */
+          if (res.status === 503 || res.status === 404) galleryReady = false;
+        } catch (_) {
+          galleryReady = false;
+        }
       }
-      return await rpc("photo_list", { p_token: need(), p_voter: voter });
+
+      /* 이 브라우저에만 저장하는 모드 */
+      const box = lread(slug);
+      if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+      const alive = (box.photos || []).filter((p) => !p.deleted_at);
+      return {
+        photos: alive.map((p) => ({
+          ...p, url: p.key, thumbUrl: p.thumb, mine: p.created_by === voter,
+        })),
+        comments: (box.comments || [])
+          .filter((c) => !c.deleted_at && c.target_type === "photo")
+          .map((c) => ({
+            id: c.id, target_id: c.target_id, body: c.body, nick: c.nick,
+            mine: c.voter_key === voter, created_at: c.created_at,
+          })),
+        cap: 30, used: alive.length, local: true,
+      };
     },
 
     /* 줄여둔 사진 두 장을 올리고 기록합니다 */
     async photoUpload({ full, thumb, width, height, caption, nick }) {
       need();
 
-      if (!online || !hasGallery()) {
+      if (!online || galleryReady === false) {
         /* 이 브라우저에만 — 미리보기용으로 data URL 로 들고 있습니다 */
         const box = lread(slug);
         if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
@@ -710,7 +743,7 @@ export function createStore(slug) {
 
     async photoRemove(id) {
       need();
-      if (!online || !hasGallery()) {
+      if (!online || galleryReady === false) {
         const box = lread(slug);
         if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
         const ph = (box.photos || []).find((p) => p.id === id && !p.deleted_at);
@@ -723,13 +756,6 @@ export function createStore(slug) {
         return { ok: true };
       }
       return await rpc("photo_remove", { p_token: need(), p_voter: voter, p_id: id });
-    },
-
-    /* 사진 주소 만들기 — 로컬 모드면 data URL 이 그대로 들어 있습니다 */
-    photoUrl(key) {
-      if (!key) return "";
-      if (key.startsWith("data:")) return key;
-      return `${R2_PUBLIC_BASE.replace(/\/$/, "")}/${key}`;
     },
 
     /* ---------- 아직 쓰는 방이라고 표시 ---------- */

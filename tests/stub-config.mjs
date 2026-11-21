@@ -30,7 +30,6 @@ const EMPTY = {
   SUPABASE_URL: "",
   SUPABASE_ANON_KEY: "",
   KAKAO_JS_KEY: "",
-  R2_PUBLIC_BASE: "",
 };
 
 /* 서버가 있는 척할 때 쓰는 가짜 주소.

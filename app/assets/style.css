@@ -1097,6 +1097,9 @@ body{
   border-left:3px solid var(--accent);padding:8px 0 8px 10px;
   background:var(--surface-2);border-radius:0 8px 8px 0;
 }
+/* 여행 중일 때는 더 눈에 띄게 — 늘 같은 모양이면 아무도 안 읽습니다 */
+.field-note.warn.strong{border-left-color:var(--danger)}
+.field-note.warn.strong strong{color:var(--danger)}
 
 .photo-grid{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));

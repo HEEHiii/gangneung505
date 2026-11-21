@@ -1,5 +1,5 @@
 /* ============================================================
-   photo-upload-url — 사진 올릴 자리를 내줍니다
+   photo-upload-url — 사진 올릴 자리와 볼 주소를 내줍니다
 
    브라우저가 Cloudflare R2 에 직접 올릴 수 있게, 짧은 시간만
    유효한 주소(presigned URL)를 만들어 줍니다.
@@ -16,6 +16,16 @@
    그래서 열쇠 대신 "이 자리에, 10분 동안만" 올릴 수 있는 주소를
    만들어 줍니다.
 
+   ★ 사진은 비밀번호 뒤에 있습니다
+
+   버킷을 공개로 두면 사진 주소를 아는 사람은 비밀번호 없이도
+   볼 수 있고, 한 번 복사해 간 주소는 비밀번호를 바꿔도 계속
+   살아 있습니다. 그래서 버킷은 비공개로 두고, 방 토큰을 가진
+   사람에게만 "한 시간 동안만 유효한 주소"를 발급합니다.
+
+   사진 자체는 여전히 R2 에서 브라우저로 바로 갑니다. 우리 서버를
+   거치지 않으므로 느려지지도, 전송량을 먹지도 않습니다.
+
    ★ 올릴 자리 이름은 DB 가 정합니다
 
    사용자가 정하게 하면 남의 방 자리 이름을 지어내 그 사진을
@@ -30,7 +40,8 @@
    ============================================================ */
 
 const MAX_BYTES = 10 * 1024 * 1024;
-const EXPIRES = 600;                      // 10분
+const EXPIRES = 600;            // 올릴 때 10분
+const VIEW_EXPIRES = 3600;      // 볼 때 1시간 — 그 뒤엔 주소가 죽습니다
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -57,8 +68,9 @@ async function sha256Hex(s: string) {
   return hex(await crypto.subtle.digest("SHA-256", enc.encode(s)));
 }
 
-/* 쿼리로 서명한 PUT 주소를 만듭니다 */
-async function presignPut(opts: {
+/* 쿼리로 서명한 주소를 만듭니다 (PUT = 올리기, GET = 보기) */
+async function presign(opts: {
+  method: "PUT" | "GET";
   accountId: string; bucket: string; key: string;
   accessKey: string; secretKey: string; expires: number;
 }) {
@@ -79,7 +91,7 @@ async function presignPut(opts: {
   params.sort();
 
   const canonical = [
-    "PUT", canonicalUri, params.toString(),
+    opts.method, canonicalUri, params.toString(),
     `host:${host}\n`, "host", "UNSIGNED-PAYLOAD",
   ].join("\n");
 
@@ -107,9 +119,51 @@ Deno.serve(async (req) => {
                   message: "사진 보관함이 아직 연결되지 않았어요" }, 503);
   }
 
-  let body: { token?: string; bytes?: number; thumbBytes?: number };
+  let body: { mode?: string; token?: string; bytes?: number; thumbBytes?: number };
   try { body = await req.json(); } catch { return json({ ok: false, code: "bad" }, 400); }
 
+  const SUPABASE_URL0 = Deno.env.get("SUPABASE_URL") ?? "";
+  const ANON0 = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const token = String(body.token || "");
+
+  const callRpc = async (fn: string, args: unknown) => {
+    const r = await fetch(`${SUPABASE_URL0}/rest/v1/rpc/${fn}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", apikey: ANON0,
+                 authorization: `Bearer ${ANON0}` },
+      body: JSON.stringify(args),
+    });
+    return { ok: r.ok, data: await r.json().catch(() => null) };
+  };
+
+  /* ================= 보기 =================
+     ★ 어떤 사진의 주소를 내줄지는 DB 가 정합니다.
+       photo_list 가 "이 토큰의 방에 있는 사진"만 돌려주므로,
+       남의 방 사진 주소를 달라고 할 방법이 없습니다. */
+  if (body.mode === "view") {
+    const got = await callRpc("photo_list", { p_token: token, p_voter: "" });
+    if (!got.ok || !got.data || !Array.isArray(got.data.photos)) {
+      return json({ ok: false, code: "expired", message: "다시 입장해주세요" }, 403);
+    }
+    const photos = got.data.photos as Array<Record<string, unknown>>;
+
+    const signed = await Promise.all(photos.map(async (p) => ({
+      ...p,
+      url: await presign({ method: "GET", accountId: ACCOUNT, bucket: BUCKET,
+                           key: String(p.key), accessKey: AK, secretKey: SK,
+                           expires: VIEW_EXPIRES }),
+      thumbUrl: await presign({ method: "GET", accountId: ACCOUNT, bucket: BUCKET,
+                                key: String(p.thumb), accessKey: AK, secretKey: SK,
+                                expires: VIEW_EXPIRES }),
+    })));
+
+    return json({ ok: true, photos: signed,
+                  comments: got.data.comments ?? [],
+                  cap: got.data.cap, used: got.data.used,
+                  expiresIn: VIEW_EXPIRES });
+  }
+
+  /* ================= 올리기 ================= */
   const bytes = Number(body.bytes) || 0;
   const thumbBytes = Number(body.thumbBytes) || 0;
   if (bytes <= 0 || bytes > MAX_BYTES || thumbBytes <= 0 || thumbBytes > MAX_BYTES) {
@@ -117,17 +171,10 @@ Deno.serve(async (req) => {
   }
 
   /* ---- 방 토큰 확인 + 상한 (판단은 DB 가 합니다) ---- */
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-  const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
   let slot: { ok?: boolean; key?: string; code?: string; message?: string; left?: number };
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/photo_allow`, {
-      method: "POST",
-      headers: { "content-type": "application/json", apikey: ANON,
-                 authorization: `Bearer ${ANON}` },
-      body: JSON.stringify({ p_token: String(body.token || "") }),
-    });
-    slot = await r.json();
+    const r = await callRpc("photo_allow", { p_token: token });
+    slot = r.data;
     if (!r.ok || !slot || slot.ok !== true || !slot.key) {
       return json({ ok: false, code: slot?.code || "denied",
                     message: slot?.message || "사진을 올릴 수 없어요" }, 403);
@@ -141,10 +188,10 @@ Deno.serve(async (req) => {
 
   try {
     const [fullUrl, thumbUrl] = await Promise.all([
-      presignPut({ accountId: ACCOUNT, bucket: BUCKET, key: fullKey,
-                   accessKey: AK, secretKey: SK, expires: EXPIRES }),
-      presignPut({ accountId: ACCOUNT, bucket: BUCKET, key: thumbKey,
-                   accessKey: AK, secretKey: SK, expires: EXPIRES }),
+      presign({ method: "PUT", accountId: ACCOUNT, bucket: BUCKET, key: fullKey,
+                accessKey: AK, secretKey: SK, expires: EXPIRES }),
+      presign({ method: "PUT", accountId: ACCOUNT, bucket: BUCKET, key: thumbKey,
+                accessKey: AK, secretKey: SK, expires: EXPIRES }),
     ]);
     return json({ ok: true, fullKey, thumbKey, fullUrl, thumbUrl, left: slot.left });
   } catch {

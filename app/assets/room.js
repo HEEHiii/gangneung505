@@ -14,7 +14,7 @@
 
 import { $, $$, esc, toast, fmtRange, won } from "./dom.js";
 import { distanceKm, prettyKm, parsePos } from "./geo.js";
-import { KAKAO_JS_KEY, hasBackend, hasMap, hasGallery } from "./config.js";
+import { KAKAO_JS_KEY, hasBackend, hasMap } from "./config.js";
 import { regionByCode, THEMES } from "./regions.js";
 import { loadKakao, kakaoReady, createMap } from "./kakaomap.js";
 import { searchByKeyword, searchByAddress, looksLikeAddress,
@@ -830,6 +830,7 @@ function initPhoto() {
   });
 
   $("#photo-del").addEventListener("click", onDeletePhoto);
+  $("#photo-save").addEventListener("click", onSavePhoto);
 
   loadGallery();
 }
@@ -857,14 +858,29 @@ function renderGallery() {
       + "지금 올리는 사진은 <strong>이 브라우저에만</strong> 저장되고 친구들에게는 안 보여요."
     : "여행 사진을 모아두는 곳이에요. 올릴 때 <strong>자동으로 줄이고</strong> "
       + "사진에 박힌 <strong>촬영 위치 정보를 지웁니다.</strong>";
-  $("#photo-warn").hidden = gallery.local || !list.length;
+
+  /* ★ 여행 중에는 더 강하게 말립니다.
+
+     "우리가 지금 여기 있다"는 정보가 위험한 것이지, 다녀온 뒤
+     사진은 추억입니다. 그래서 끝난 날짜를 보고 문구를 바꿉니다.
+     안내를 늘 똑같이 띄우면 아무도 안 읽습니다. */
+  const ended = room && room.end_date
+    && new Date(`${room.end_date}T23:59:59`) < new Date();
+  $("#photo-warn").innerHTML = ended
+    ? "링크를 가진 사람은 누구나 볼 수 있어요. "
+      + "얼굴이 크게 나온 사진은 친구들에게 한 번 물어봐 주세요."
+    : "⚠️ <strong>여행이 끝난 뒤에 올리는 걸 권해요.</strong> "
+      + "여행 중에 올리면 <strong>지금 어디에 있는지</strong>가 링크를 가진 사람 모두에게 알려져요. "
+      + "사진은 다녀와서 모아도 늦지 않아요.";
+  $("#photo-warn").classList.toggle("strong", !ended);
+  $("#photo-warn").hidden = gallery.local && !list.length;
 
   $("#photo-grid").innerHTML = list.map((p) => {
     const n = (gallery.comments || []).filter((c) => c.target_id === p.id).length;
     return `
       <button type="button" class="photo-cell" data-ph="${esc(p.id)}"
               aria-label="${esc(p.caption || "사진")} 크게 보기">
-        <img src="${esc(store.photoUrl(p.thumb))}" alt="${esc(p.caption || "")}" loading="lazy">
+        <img src="${esc(p.thumbUrl || "")}" alt="${esc(p.caption || "")}" loading="lazy">
         ${n ? `<span class="n">💬 ${n}</span>` : ""}
       </button>`;
   }).join("");
@@ -916,11 +932,12 @@ function openPhoto(id) {
   if (!p) return;
   viewing = p;
 
-  $("#photo-big").src = store.photoUrl(p.key);
+  $("#photo-big").src = p.url || "";
   $("#photo-big").alt = p.caption || "여행 사진";
   $("#photo-cap").textContent = [p.caption, p.nick && `— ${p.nick}`]
     .filter(Boolean).join(" ");
   $("#photo-del").hidden = !p.mine;
+  $("#photo-save").hidden = !p.url;
 
   renderPhotoComments();
   $("#photo-view").showModal();
@@ -979,6 +996,33 @@ function renderPhotoComments() {
       toast(e.message || "지우지 못했어요");
     }
   }, { once: true });
+}
+
+/* ★ 사진을 폰에 저장하기
+
+   주소가 한 시간 뒤에 죽기 때문에 "주소를 복사해 두기"는 안 되지만,
+   사진 자체를 받아두는 건 당연히 됩니다. 밖으로 보내고 싶으면
+   저장해서 파일로 보내면 됩니다.
+
+   주소가 우리 도메인이 아니라서 <a download> 만으로는 저장이 안 되고
+   새 탭으로 열립니다. 그래서 직접 받아서 저장합니다. */
+async function onSavePhoto() {
+  if (!viewing || !viewing.url) return;
+  try {
+    const res = await fetch(viewing.url);
+    if (!res.ok) throw new Error("받지 못했어요");
+    const blob = await res.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `${(room && room.title) || "여행"}-${viewing.id.slice(0, 6)}.webp`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 1000);
+  } catch (_) {
+    toast("저장하지 못했어요. 사진을 길게 눌러 저장해보세요");
+  }
 }
 
 async function onDeletePhoto() {

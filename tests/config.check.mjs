@@ -44,16 +44,16 @@ const read = (name) => {
 const URL_ = read("SUPABASE_URL");
 const KEY = read("SUPABASE_ANON_KEY");
 const KAKAO = read("KAKAO_JS_KEY");
-const R2 = read("R2_PUBLIC_BASE");
+const PHOTO_FN = read("PHOTO_FN");
 const PROVIDER = read("LOGIN_PROVIDER");
 const RESOLVE_FN = read("RESOLVE_FN");
 
 console.log("── 네 줄이 제자리에 있는지");
 for (const [n, v] of [["SUPABASE_URL", URL_], ["SUPABASE_ANON_KEY", KEY],
-                      ["KAKAO_JS_KEY", KAKAO], ["R2_PUBLIC_BASE", R2]]) {
+                      ["KAKAO_JS_KEY", KAKAO], ["PHOTO_FN", PHOTO_FN]]) {
   ok(v !== null, `${n} 줄을 읽을 수 있음`);
 }
-if ([URL_, KEY, KAKAO, R2].some((v) => v === null)) {
+if ([URL_, KEY, KAKAO, PHOTO_FN].some((v) => v === null)) {
   console.log("\nconfig.js 모양이 바뀌었습니다. tests/stub-config.mjs 도 같이 확인하세요.");
   process.exit(1);
 }
@@ -121,13 +121,20 @@ if (URL_) {
 } else {
   console.log("  건너뜀 — Supabase 주소가 비어 있음");
 }
-if (R2) ok(R2.startsWith("https://"), "R2_PUBLIC_BASE 가 https");
+ok(/^[a-z0-9][a-z0-9-]{0,40}$/.test(PHOTO_FN || ""),
+  `PHOTO_FN 이 Supabase 함수 이름 모양  (${JSON.stringify(PHOTO_FN)})`);
+
+/* ★ 공개 주소를 적는 칸이 다시 생기면 안 됩니다.
+   그걸 쓰면 사진이 비밀번호 밖으로 나가고, 한 번 복사된 주소는
+   비밀번호를 바꿔도 계속 살아 있습니다. */
+ok(!/export const R2_PUBLIC_BASE/.test(src),
+  "사진 공개 주소 칸이 없다 (사진은 비밀번호 뒤에 있어야 합니다)");
 
 /* ---------- 4. 지금 어떤 모드인지 알려주기 ---------- */
 console.log("── 지금 상태");
 console.log(`  저장   ${URL_ && KEY ? "Supabase 서버 (친구와 합쳐짐)" : "이 브라우저에만"}`);
 console.log(`  지도   ${KAKAO ? "카카오 지도" : "안내판으로 대체"}`);
-console.log(`  갤러리 ${R2 ? "켜짐" : "숨김 (3단계)"}`);
+console.log(`  갤러리 ${PHOTO_FN} (연결됐는지는 열 때 확인합니다)`);
 console.log(`  로그인 ${PROVIDER}`);
 console.log(`  링크풀기 ${RESOLVE_FN}`);
 

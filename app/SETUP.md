@@ -291,9 +291,16 @@ Supabase 왼쪽 메뉴 **Edge Functions** → **Deploy a new function** →
 2. 왼쪽 **R2** → **Create bucket**
    - 이름: 아무거나 (예: `trip-photos`)
    - **Location: Asia-Pacific** 권장
-3. 그 버킷 → **Settings** → **Public access**
-   - **Custom Domain** 을 붙이거나, **R2.dev subdomain** 을 켭니다
-   - 나오는 주소(예: `https://pub-xxxx.r2.dev`)를 복사해두세요
+3. **공개 설정은 하지 마세요.** 버킷은 비공개로 둡니다.
+
+   > ⚠️ 공개로 열면 사진 주소를 아는 사람은 **비밀번호 없이도** 볼 수
+   > 있고, 한 번 복사해 간 주소는 **비밀번호를 바꿔도 계속 살아**
+   > 있습니다. 비공개로 두면 방에 들어온 사람에게만 **한 시간짜리
+   > 주소**가 발급되고, 그 뒤엔 죽습니다.
+   >
+   > 사진 자체는 여전히 R2 에서 브라우저로 바로 오므로 느려지지
+   > 않습니다. 중계하지 않습니다.
+
 4. R2 첫 화면 → **Manage API tokens** → **Create API token**
    - 권한: **Object Read & Write**, 그 버킷만
    - 나오는 **Access Key ID** 와 **Secret Access Key** 를 복사
@@ -327,9 +334,12 @@ Supabase 왼쪽 메뉴 **Edge Functions** → **Deploy a new function** →
 ### 5) config.js 채우기
 
 ```js
-export const R2_PUBLIC_BASE = "https://pub-xxxx.r2.dev";   // 3번에서 복사한 주소
-export const PHOTO_FN = "photo-upload-url";                 // 4번의 진짜 이름
+export const PHOTO_FN = "photo-upload-url";   // 4번에서 확인한 진짜 이름
 ```
+
+공개 주소를 적는 칸은 **없습니다** — 일부러입니다. 주소를 적어두면
+그게 곧 비밀번호 밖의 통로가 되니까요. 연결됐는지는 사진 탭을 열 때
+함수에 물어봐서 압니다.
 
 ### 올리기 전에 알아두실 것
 
@@ -343,6 +353,15 @@ export const PHOTO_FN = "photo-upload-url";                 // 4번의 진짜 �
 >
 > 좌표를 박은 사진으로 실제 확인한 검사가
 > `tests/photo.spec.mjs` 에 있습니다.
+
+**여행이 끝난 뒤에 올리는 걸 권합니다.** 여행 중에 올리면 "지금 어디에
+있는지"가 링크를 가진 사람 모두에게 알려집니다. 사진 탭이 날짜를 보고
+그렇게 안내합니다.
+
+사진을 **폰에 저장하는 건 그대로 됩니다.** 크게 보기에서 "사진 저장"
+버튼을 누르면 돼요. 안 되는 건 "사진 **주소**를 복사해 방 밖으로
+보내는 것"뿐이고, 그게 막으려던 겁니다. 밖으로 보내려면 저장해서
+파일로 보내면 됩니다.
 
 한 방에 **300장**까지입니다.
 
