@@ -817,6 +817,118 @@ select pg_temp.ok(
 
 
 -- ============================================================
+--  9.9 사진
+--
+--  ★ 올릴 자리 이름(key)은 서버가 정합니다. 사용자가 정하게 하면
+--    남의 방 자리 이름을 지어내 그 사진을 덮어쓰거나, 자기 방
+--    것처럼 기록할 수 있습니다. 그게 막히는지가 핵심입니다.
+-- ============================================================
+\echo '── 9.9 사진'
+reset role;
+set role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', false);
+
+insert into t select 'pa', (public.photo_allow(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b')))::text;
+
+reset role;
+select pg_temp.ok((select v::jsonb ->> 'ok' from t where k = 'pa') = 'true', '올릴 자리를 내준다');
+select pg_temp.ok((select v::jsonb ->> 'key' from t where k = 'pa') is not null, '자리 이름이 있다');
+select pg_temp.ok(
+  (select v::jsonb ->> 'key' from t where k = 'pa')
+    like (select v::jsonb ->> 'room' from t where k = 'pa') || '/%',
+  '자리 이름이 이 방 것으로 시작한다');
+
+set role anon;
+insert into t select 'ph1', (public.photo_add(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A',
+  (select v::jsonb ->> 'key' from t where k = 'pa'),
+  (select v::jsonb ->> 'key' from t where k = 'pa') || '-t',
+  1600, 1067, 250000, '경포해변', '민수')) ->> 'id';
+
+-- ★ 남의 자리 이름으로 기록하려는 시도
+do $$
+declare v_blocked boolean := false; v_why text;
+begin
+  begin
+    perform public.photo_add(
+      (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A',
+      '00000000-0000-0000-0000-000000000000/stolen',
+      '00000000-0000-0000-0000-000000000000/stolen-t',
+      100, 100, 1000, null, null);
+  exception when others then v_blocked := true; v_why := sqlerrm;
+  end;
+  if v_blocked then raise notice '  OK    ★ 남의 방 자리 이름으로는 기록 못 함 (%)', v_why;
+  else raise exception 'FAIL: 남의 자리 이름이 통과했습니다';
+  end if;
+end $$;
+
+-- 사진에 댓글
+insert into t select 'pc', (public.comment_add(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-B',
+  'photo', (select v from t where k = 'ph1')::uuid, '여기 예뻤다', '지아')) ->> 'id';
+
+-- 없는 사진에 댓글 다는 시도
+do $$
+declare v_blocked boolean := false;
+begin
+  begin
+    perform public.comment_add(
+      (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'v',
+      'photo', '00000000-0000-0000-0000-000000000000'::uuid, '유령', '지아');
+  exception when others then v_blocked := true;
+  end;
+  if v_blocked then raise notice '  OK    없는 사진에는 댓글을 못 단다';
+  else raise exception 'FAIL: 없는 사진에 댓글이 달렸습니다';
+  end if;
+end $$;
+
+insert into t select 'plist', (public.photo_list(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A'))::text;
+
+reset role;
+select pg_temp.ok((select count(*) from app.photos where deleted_at is null) = 1, '사진 1장 기록됨');
+select pg_temp.ok(
+  jsonb_array_length((select v::jsonb -> 'photos' from t where k = 'plist')) = 1,
+  '갤러리 목록에 실린다');
+select pg_temp.ok(
+  jsonb_array_length((select v::jsonb -> 'comments' from t where k = 'plist')) = 1,
+  '사진 댓글이 갤러리 목록에 함께 온다');
+select pg_temp.ok(
+  (select v from t where k = 'plist') not like '%voter_key%',
+  '★ 갤러리 목록에도 voter_key 가 새지 않는다');
+select pg_temp.ok(
+  (select v::jsonb -> 'photos' -> 0 ->> 'mine' from t where k = 'plist') = 'true',
+  '내가 올린 것은 mine=true');
+select pg_temp.ok((select v::jsonb ->> 'cap' from t where k = 'plist') = '300', '상한을 알려준다');
+
+-- 남의 사진은 못 지운다
+set role anon;
+do $$
+declare v_blocked boolean := false;
+begin
+  begin
+    perform public.photo_remove(
+      (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-B',
+      (select v from t where k = 'ph1')::uuid);
+  exception when others then v_blocked := true;
+  end;
+  if v_blocked then raise notice '  OK    남의 사진은 못 지운다';
+  else raise exception 'FAIL: 남의 사진이 지워졌습니다';
+  end if;
+end $$;
+select public.photo_remove(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A',
+  (select v from t where k = 'ph1')::uuid);
+
+reset role;
+select pg_temp.ok((select count(*) from app.photos where deleted_at is null) = 0,
+  '내가 올린 사진은 지울 수 있다');
+select pg_temp.ok((select count(*) from app.photos) = 1,
+  '지워도 행은 남는다 (R2 파일을 나중에 정리할 수 있게)');
+
+
+-- ============================================================
 --  10. 방 삭제는 자식까지 함께
 -- ============================================================
 \echo '── 10. 방 삭제'

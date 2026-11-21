@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stubConfig } from "./stub-config.mjs";
+import { gpsJpegBytes } from "./fixtures/gps-jpeg.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.BASE || "http://localhost:8080";
@@ -994,6 +995,84 @@ console.log("── 에어비앤비 링크");
     "대략 위치라고 솔직하게 표시한다");
   eq(await page.locator("#lodging-list .btn-link").first().getAttribute("href"), AIR,
     "★ 보러가기가 에어비앤비 예약 페이지로 간다");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
+
+/* ============================================================
+   사진 갤러리
+
+   ★ R2 설정이 없는 상태입니다. 그때도 화면이 돌아가되,
+     "이 브라우저에만 저장된다"고 솔직히 말해야 합니다.
+     조용히 로컬에 쌓아두면 친구들에게 안 보이는 걸 모른 채
+     수십 장을 올리게 됩니다.
+   ============================================================ */
+console.log("── 사진 갤러리");
+{
+  const { ctx, page, errors } = await fresh();
+  await openRoom(page, await makeRoom(page, { title: "사진 시험" }));
+  await enter(page);
+
+  await page.click('#tabs a[data-tab="photo"]');
+  await page.waitForSelector("#panel-photo:not([hidden])", { timeout: 5000 });
+
+  eq(await page.locator("#photo-empty").isVisible(), true, "처음에는 '아직 사진이 없어요'");
+  ok((await page.locator("#photo-intro").textContent()).includes("이 브라우저에만"),
+    "★ 보관함이 없으면 친구들에게 안 보인다고 솔직하게 말한다");
+
+  /* 사진 올리기 — GPS 가 박힌 사진으로 */
+  await page.setInputFiles("#photo-input", {
+    name: "trip.jpg", mimeType: "image/jpeg", buffer: Buffer.from(gpsJpegBytes()),
+  });
+  await page.waitForTimeout(1500);
+
+  eq(await page.locator(".photo-cell").count(), 1, "사진이 한 장 올라간다");
+  eq(await page.locator("#photo-empty").isVisible(), false, "안내가 사라진다");
+  ok((await page.locator("#photo-status").textContent()).includes("줄였어요"),
+    "얼마나 줄였는지 알려준다");
+  ok((await page.locator("#photo-left").textContent()).includes("1장"),
+    "몇 장인지 보여준다");
+
+  /* 크게 보기 */
+  await page.locator(".photo-cell").first().click();
+  await page.waitForTimeout(400);
+  eq(await page.locator("#photo-view").isVisible(), true, "누르면 크게 보인다");
+  eq(await page.locator("#photo-del").isVisible(), true, "내가 올린 사진은 지울 수 있다");
+
+  /* 사진에 댓글 */
+  let asked = 0;
+  page.on("dialog", async (d) => {
+    if (d.type() === "prompt") { asked++; await d.accept("민수"); }
+    else await d.accept();
+  });
+  await page.locator("#photo-cmt-form .cmt-input").fill("여기 진짜 예뻤다");
+  await page.locator("#photo-cmt-go").click();
+  await page.waitForTimeout(800);
+  ok((await page.locator("#photo-cmts").textContent()).includes("여기 진짜 예뻤다"),
+    "사진에 댓글을 달 수 있다");
+  ok((await page.locator("#photo-cmts").textContent()).includes("민수"), "별명이 보인다");
+
+  await page.locator("#photo-view button[type=submit]").click();
+  await page.waitForTimeout(300);
+  ok((await page.locator(".photo-cell").first().textContent()).includes("1"),
+    "목록에 댓글 개수가 보인다");
+
+  /* 새로고침해도 남아 있는가 */
+  await page.reload();
+  await page.waitForFunction(() => window.__roomReady === true, { timeout: 8000 });
+  await page.waitForTimeout(400);
+  await page.click('#tabs a[data-tab="photo"]');
+  await page.waitForTimeout(600);
+  eq(await page.locator(".photo-cell").count(), 1, "새로고침해도 사진이 남아 있음");
+
+  /* 지우기 */
+  await page.locator(".photo-cell").first().click();
+  await page.waitForTimeout(300);
+  await page.locator("#photo-del").click();
+  await page.waitForTimeout(800);
+  eq(await page.locator(".photo-cell").count(), 0, "내가 올린 사진을 지울 수 있다");
 
   eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
   await ctx.close();

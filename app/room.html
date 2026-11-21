@@ -47,6 +47,7 @@
       <a href="#food"  data-tab="food">맛집</a>
       <a href="#plan"  data-tab="plan">일정</a>
       <a href="#money" data-tab="money">정산</a>
+      <a href="#photo" data-tab="photo">사진</a>
     </nav>
   </header>
 
@@ -184,7 +185,52 @@
         <button type="button" id="settle-share" class="btn-quiet">카톡으로 보내기</button>
       </div>
     </section>
+
+    <!-- ───────── 사진 (3단계) ───────── -->
+    <section class="panel" id="panel-photo" hidden>
+      <div class="panel-head"><h2>사진</h2></div>
+
+      <p class="field-note" id="photo-intro">
+        여행 사진을 모아두는 곳이에요. 올릴 때 <strong>자동으로 줄이고</strong>
+        사진에 박힌 <strong>촬영 위치 정보를 지웁니다.</strong>
+      </p>
+
+      <div class="card">
+        <label class="photo-pick">
+          <input type="file" id="photo-input" accept="image/*" multiple>
+          <span class="photo-pick-btn">사진 고르기</span>
+          <span class="muted" id="photo-left"></span>
+        </label>
+        <p class="field-note" id="photo-status"></p>
+        <p class="field-note bad" id="photo-error"></p>
+      </div>
+
+      <p class="field-note warn" id="photo-warn">
+        ⚠️ <strong>링크를 가진 사람은 누구나 볼 수 있어요.</strong>
+        얼굴이 크게 나온 사진은 친구들에게 한 번 물어봐 주세요.
+      </p>
+
+      <div id="photo-grid" class="photo-grid"></div>
+
+      <div class="soon" id="photo-empty">
+        <strong>아직 사진이 없어요</strong>
+        <p>여행 다녀와서 찍은 사진을 모아보세요. 사진마다 댓글도 달 수 있어요.</p>
+      </div>
+    </section>
   </main>
+
+  <dialog id="photo-view" class="dlg photo-dlg">
+    <form method="dialog" class="dlg-box photo-box">
+      <img id="photo-big" alt="">
+      <p class="field-note" id="photo-cap"></p>
+      <div class="photo-cmts" id="photo-cmts"></div>
+      <div class="dlg-sep"></div>
+      <div class="photo-acts">
+        <button type="button" class="btn-danger" id="photo-del" hidden>사진 지우기</button>
+        <button type="submit" class="btn-quiet">닫기</button>
+      </div>
+    </form>
+  </dialog>
 
   <footer class="foot">
     <p class="muted" id="room-foot"></p>

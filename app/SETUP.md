@@ -263,6 +263,91 @@ Supabase 왼쪽 메뉴 **Edge Functions** → **Deploy a new function** →
 
 ---
 
+## 선택 — 사진 갤러리 (Cloudflare R2)
+
+여행 사진을 모아두는 기능입니다. **안 해도 됩니다** — 안 하면 사진 탭이
+"이 브라우저에만 저장" 모드로 돌아갑니다 (혼자 눌러볼 수는 있지만
+친구들에게는 안 보이고 30장까지).
+
+> **왜 Supabase 말고 Cloudflare 인가**
+>
+> 사진은 이 서비스에서 **유일하게 진짜 돈이 드는 부분**입니다.
+> 휴대폰 사진 한 장이 3~5MB 이고 Supabase 무료 저장소는 1GB 라,
+> 서비스 전체에서 200~300장이면 끝납니다. 더 큰 문제는 보는 쪽이에요 —
+> 월 5GB 전송 제한에서 친구 10명이 사진 30장짜리 방을 한 번 보면
+> 75MB, 즉 **월 65번 보면 소진**됩니다.
+>
+> Cloudflare R2 는 **10GB 무료**에 **보는 것이 무료**라 사진에는
+> 사실상 정답입니다.
+
+### 1) 표 만들기
+
+[`0008_photos.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0008_photos.sql)
+을 SQL Editor 에 붙여넣고 Run.
+
+### 2) Cloudflare 준비 (약 15분)
+
+1. [cloudflare.com](https://dash.cloudflare.com) 가입
+2. 왼쪽 **R2** → **Create bucket**
+   - 이름: 아무거나 (예: `trip-photos`)
+   - **Location: Asia-Pacific** 권장
+3. 그 버킷 → **Settings** → **Public access**
+   - **Custom Domain** 을 붙이거나, **R2.dev subdomain** 을 켭니다
+   - 나오는 주소(예: `https://pub-xxxx.r2.dev`)를 복사해두세요
+4. R2 첫 화면 → **Manage API tokens** → **Create API token**
+   - 권한: **Object Read & Write**, 그 버킷만
+   - 나오는 **Access Key ID** 와 **Secret Access Key** 를 복사
+     (Secret 은 **한 번만** 보여줍니다)
+5. **Account ID** 도 복사 (R2 화면 오른쪽에 있습니다)
+
+### 3) Supabase 에 열쇠 넣기
+
+**Edge Functions → Secrets** 에서 네 개를 추가합니다:
+
+| 이름 | 값 |
+|---|---|
+| `R2_ACCOUNT_ID` | Cloudflare Account ID |
+| `R2_BUCKET` | 버킷 이름 |
+| `R2_ACCESS_KEY_ID` | Access Key ID |
+| `R2_SECRET_KEY` | Secret Access Key |
+
+> ⚠️ 이 네 개는 **진짜 비밀**입니다. `config.js` 에 넣으면 안 됩니다.
+> 브라우저로 내려가면 누구나 우리 저장소에 아무거나 올릴 수 있습니다.
+
+### 4) 함수 올리기
+
+**Edge Functions → Deploy a new function → Via Editor**
+
+- 예제 코드를 **전부 지우고**
+  [`photo-upload-url/index.ts`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/functions/photo-upload-url/index.ts)
+  붙여넣기 (한 파일입니다)
+- **Deploy** 후 **Settings → Verify JWT 끄기**
+- 주소창의 `/functions/<이름>/details` 에서 **진짜 이름** 확인
+
+### 5) config.js 채우기
+
+```js
+export const R2_PUBLIC_BASE = "https://pub-xxxx.r2.dev";   // 3번에서 복사한 주소
+export const PHOTO_FN = "photo-upload-url";                 // 4번의 진짜 이름
+```
+
+### 올리기 전에 알아두실 것
+
+사진은 **올릴 때 자동으로 줄입니다** — 긴 변 1600px, 목록용은 400px.
+그러면 전송량이 20분의 1이 되고, 더 중요하게는 **사진에 박힌 촬영
+위치(GPS)가 지워집니다.**
+
+> 휴대폰 사진에는 찍은 자리의 좌표가 들어 있습니다. 숙소에서 찍은
+> 사진을 그대로 올리면 **숙소 위치가 좌표까지 공개**됩니다. 링크를
+> 가진 누구나 볼 수 있는 방인데요. 줄이는 과정에서 그게 사라집니다.
+>
+> 좌표를 박은 사진으로 실제 확인한 검사가
+> `tests/photo.spec.mjs` 에 있습니다.
+
+한 방에 **300장**까지입니다.
+
+---
+
 ## 흔한 실수 세 가지
 
 | 틀리기 쉬운 것 | 맞는 것 | 증상 |

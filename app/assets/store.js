@@ -17,7 +17,8 @@
    ============================================================ */
 
 import { rpc, RpcError } from "./supa.js";
-import { hasBackend, SUPABASE_URL, SUPABASE_ANON_KEY, RESOLVE_FN } from "./config.js";
+import { hasBackend, SUPABASE_URL, SUPABASE_ANON_KEY, RESOLVE_FN,
+         R2_PUBLIC_BASE, PHOTO_FN, hasGallery } from "./config.js";
 import { voterKey, newId } from "./session.js";
 
 const LOCAL_TOKEN = "local-mode";
@@ -124,6 +125,7 @@ export async function createRoom(form) {
       expenses: [],
       itinerary: [],
       comments: [],
+      photos: [],
     };
     lwrite(slug, box);
     return { slug, token: LOCAL_TOKEN, local: true };
@@ -489,8 +491,11 @@ export function createStore(slug) {
         const box = lread(slug);
         if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
         box.comments = box.comments || [];
-        if (!box.places.some((p) => p.id === targetId && !p.deleted_at)) {
-          throw new RpcError("denied", "없는 장소예요", "miss");
+        /* 댓글은 장소에도 사진에도 달립니다. 어느 쪽인지 보고 확인합니다 */
+        const pool = targetType === "photo" ? (box.photos || []) : box.places;
+        if (!pool.some((x) => x.id === targetId && !x.deleted_at)) {
+          throw new RpcError("denied",
+            targetType === "photo" ? "없는 사진이에요" : "없는 장소예요", "miss");
         }
         if (box.comments.filter((c) => !c.deleted_at).length >= 200) {
           throw new RpcError("limit", "한 방에 달 수 있는 댓글을 넘었어요 (200개)", "cap");
@@ -599,6 +604,132 @@ export function createStore(slug) {
       } finally {
         clearTimeout(timer);
       }
+    },
+
+    /* ---------- 갤러리 ----------
+
+       ★ 사진 파일은 Cloudflare R2 에 있고, 여기에는 "어디 있는지"만
+         적힙니다. 올리는 순서:
+           1) 브라우저에서 줄이고 위치정보를 지웁니다 (photo.js)
+           2) Edge Function 에 "올릴 자리" 를 받습니다
+              — 자리 이름은 서버가 정합니다. 사용자가 정하게 하면
+                남의 사진을 덮어쓰는 이름을 지어낼 수 있습니다
+           3) 브라우저가 R2 에 직접 올립니다 (우리 서버를 안 거칩니다)
+           4) "올렸다"고 DB 에 적습니다
+
+       ★ R2 설정이 없으면 이 브라우저에만 저장합니다.
+         설정 전에도 화면을 다 눌러볼 수 있어야 합니다. */
+    async photoList() {
+      need();
+      if (!online) {
+        const box = lread(slug);
+        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+        const alive = (box.photos || []).filter((p) => !p.deleted_at);
+        return {
+          photos: alive.map((p) => ({ ...p, mine: p.created_by === voter })),
+          comments: (box.comments || [])
+            .filter((c) => !c.deleted_at && c.target_type === "photo")
+            .map((c) => ({
+              id: c.id, target_id: c.target_id, body: c.body, nick: c.nick,
+              mine: c.voter_key === voter, created_at: c.created_at,
+            })),
+          cap: 300, used: alive.length, local: true,
+        };
+      }
+      return await rpc("photo_list", { p_token: need(), p_voter: voter });
+    },
+
+    /* 줄여둔 사진 두 장을 올리고 기록합니다 */
+    async photoUpload({ full, thumb, width, height, caption, nick }) {
+      need();
+
+      if (!online || !hasGallery()) {
+        /* 이 브라우저에만 — 미리보기용으로 data URL 로 들고 있습니다 */
+        const box = lread(slug);
+        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+        box.photos = box.photos || [];
+        if (box.photos.filter((p) => !p.deleted_at).length >= 30) {
+          throw new RpcError("limit",
+            "이 브라우저에만 저장하는 중이라 30장까지예요 (사진 보관함을 연결하면 300장)", "cap");
+        }
+        const toUrl = (b) => new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.onerror = () => rej(new Error("읽지 못했어요"));
+          r.readAsDataURL(b);
+        });
+        const id = newId("ph");
+        box.photos.push({
+          id, key: await toUrl(full), thumb: await toUrl(thumb),
+          width, height, bytes: full.size,
+          caption: caption || null, nick: nick || null,
+          created_by: voter, created_at: new Date().toISOString(),
+        });
+        lwrite(slug, box);
+        return { id, local: true };
+      }
+
+      /* 1) 올릴 자리 받기 */
+      const slot = await fetch(`${SUPABASE_URL}/functions/v1/${PHOTO_FN}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          apikey: SUPABASE_ANON_KEY,
+          authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ token: need(), bytes: full.size, thumbBytes: thumb.size }),
+      }).then((r) => r.json()).catch(() => null);
+
+      if (!slot || !slot.ok) {
+        throw new RpcError(
+          (slot && slot.code) || "net",
+          (slot && slot.message) || "사진 올릴 자리를 받지 못했어요",
+          "slot");
+      }
+
+      /* 2) R2 에 직접 올리기 — 우리 서버를 거치지 않습니다 */
+      const put = async (url, blob) => {
+        const res = await fetch(url, {
+          method: "PUT",
+          headers: { "content-type": blob.type || "image/webp" },
+          body: blob,
+        });
+        if (!res.ok) throw new RpcError("upload", "사진을 올리지 못했어요", `r2 ${res.status}`);
+      };
+      await put(slot.fullUrl, full);
+      await put(slot.thumbUrl, thumb);
+
+      /* 3) 올렸다고 적기 */
+      return await rpc("photo_add", {
+        p_token: need(), p_voter: voter,
+        p_key: slot.fullKey, p_thumb: slot.thumbKey,
+        p_width: width, p_height: height, p_bytes: full.size,
+        p_caption: caption || null, p_nick: nick || null,
+      });
+    },
+
+    async photoRemove(id) {
+      need();
+      if (!online || !hasGallery()) {
+        const box = lread(slug);
+        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+        const ph = (box.photos || []).find((p) => p.id === id && !p.deleted_at);
+        if (!ph) throw new RpcError("denied", "없는 사진이에요", "miss");
+        if (ph.created_by !== voter) {
+          throw new RpcError("denied", "직접 올린 사진만 지울 수 있어요", "not mine");
+        }
+        ph.deleted_at = new Date().toISOString();
+        lwrite(slug, box);
+        return { ok: true };
+      }
+      return await rpc("photo_remove", { p_token: need(), p_voter: voter, p_id: id });
+    },
+
+    /* 사진 주소 만들기 — 로컬 모드면 data URL 이 그대로 들어 있습니다 */
+    photoUrl(key) {
+      if (!key) return "";
+      if (key.startsWith("data:")) return key;
+      return `${R2_PUBLIC_BASE.replace(/\/$/, "")}/${key}`;
     },
 
     /* ---------- 아직 쓰는 방이라고 표시 ---------- */

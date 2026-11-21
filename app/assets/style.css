@@ -1082,3 +1082,39 @@ body{
 }
 .cmt-input:focus{outline:none;border-color:var(--accent)}
 .cmt-form button{flex:0 0 auto;height:34px;padding:0 12px;font-size:13px}
+
+
+/* ───────── 사진 갤러리 ───────── */
+.photo-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer}
+.photo-pick input{position:absolute;width:1px;height:1px;opacity:0;clip-path:inset(50%)}
+.photo-pick-btn{
+  display:inline-block;padding:10px 16px;border:1.5px solid var(--line-strong);
+  border-radius:8px;background:var(--surface-2);font-weight:600;font-size:14px;
+}
+.photo-pick:hover .photo-pick-btn{border-color:var(--text)}
+
+.field-note.warn{
+  border-left:3px solid var(--accent);padding:8px 0 8px 10px;
+  background:var(--surface-2);border-radius:0 8px 8px 0;
+}
+
+.photo-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
+  gap:6px;margin-bottom:16px;
+}
+.photo-cell{
+  position:relative;aspect-ratio:1;border:0;padding:0;cursor:pointer;
+  border-radius:8px;overflow:hidden;background:var(--surface-2);
+}
+.photo-cell img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-cell .n{
+  position:absolute;right:4px;bottom:4px;font-size:11px;
+  background:rgba(0,0,0,.55);color:#fff;border-radius:6px;padding:1px 5px;
+}
+.photo-cell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.photo-dlg::backdrop{background:rgba(0,0,0,.75)}
+.photo-box{max-width:min(94vw,680px)}
+#photo-big{width:100%;height:auto;border-radius:8px;display:block;background:var(--surface-2)}
+.photo-acts{display:flex;gap:8px;justify-content:space-between}
+.photo-cmts{margin-top:10px}

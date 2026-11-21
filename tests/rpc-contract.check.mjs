@@ -127,7 +127,7 @@ console.log("── 함수 목록");
    이 목록에 적지 않고 그냥 넘어가게 만들면, 나중에 쓰지 않는 함수가
    열린 채 남아도 아무도 모르게 됩니다. 그래서 예외는 "여기 적은
    것만" 으로 못박습니다. */
-const SERVER_ONLY = new Set(["resolve_allow"]);
+const SERVER_ONLY = new Set(["resolve_allow", "photo_allow"]);
 
 const jsNames = Object.keys(RPC).sort();
 const sqlNames = Object.keys(sqlFns).sort();

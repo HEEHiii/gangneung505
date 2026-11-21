@@ -279,3 +279,81 @@ grant execute on function public.photo_allow(text)                              
 grant execute on function public.photo_add(text, text, text, text, int, int, int, text, text)    to anon, authenticated;
 grant execute on function public.photo_remove(text, text, uuid)                                  to anon, authenticated;
 grant execute on function public.photo_list(text, text)                                          to anon, authenticated;
+
+
+-- ============================================================
+--  comment_add 가 사진도 확인하게 합니다
+--
+--  ★ 0006 을 만들 때는 사진이 없어서 'place' 만 확인했습니다.
+--    그대로 두면 target_type='photo' 로 아무 uuid 나 적어 남의 방
+--    사진에 댓글을 다는 것처럼 꾸밀 수 있습니다. 실제로 보이지는
+--    않지만, 확인하지 않는 입력은 결국 문제가 됩니다.
+--
+--  0006 의 정의를 그대로 가져와 photo 분기만 더한 것입니다.
+-- ============================================================
+create or replace function public.comment_add(
+  p_token  text,
+  p_voter  text,
+  p_target_type text,
+  p_target_id   uuid,
+  p_body   text,
+  p_nick   text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_room uuid := app.room_from_token(p_token);
+  v_body text := trim(coalesce(p_body, ''));
+  v_nick text := trim(coalesce(p_nick, ''));
+  v_n    int;
+  v_id   uuid;
+begin
+  if coalesce(p_voter, '') = '' then
+    raise exception '[denied] 누가 쓰는지 알 수 없어요';
+  end if;
+  if p_target_type not in ('place', 'photo') then
+    raise exception '[bad] 어디에 다는 댓글인지 알 수 없어요';
+  end if;
+  if v_body = '' then
+    raise exception '[bad] 내용을 적어주세요';
+  end if;
+  if char_length(v_body) > 500 then
+    raise exception '[bad] 댓글이 너무 길어요 (500자까지)';
+  end if;
+  if v_nick = '' then
+    raise exception '[bad] 별명을 적어주세요';
+  end if;
+  if char_length(v_nick) > 12 then
+    raise exception '[bad] 별명이 너무 길어요 (12자까지)';
+  end if;
+
+  -- 이 방의 것이 맞는지. 아니면 남의 방 것에 댓글을 달 수 있습니다.
+  if p_target_type = 'place' then
+    if not exists (select 1 from app.places
+                    where id = p_target_id and room_id = v_room and deleted_at is null) then
+      raise exception '[denied] 없는 장소예요';
+    end if;
+  else
+    if not exists (select 1 from app.photos
+                    where id = p_target_id and room_id = v_room and deleted_at is null) then
+      raise exception '[denied] 없는 사진이에요';
+    end if;
+  end if;
+
+  select count(*) into v_n from app.comments
+   where room_id = v_room and deleted_at is null;
+  if v_n >= 200 then
+    raise exception '[limit] 한 방에 달 수 있는 댓글을 넘었어요 (200개)';
+  end if;
+
+  insert into app.comments (room_id, target_type, target_id, body, nick, voter_key)
+  values (v_room, p_target_type, p_target_id, v_body, v_nick, p_voter)
+  returning id into v_id;
+
+  update app.rooms set last_seen_at = now() where id = v_room;
+  return jsonb_build_object('id', v_id);
+end;
+$$;

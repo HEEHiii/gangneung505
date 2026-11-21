@@ -14,7 +14,7 @@
 
 import { $, $$, esc, toast, fmtRange, won } from "./dom.js";
 import { distanceKm, prettyKm, parsePos } from "./geo.js";
-import { KAKAO_JS_KEY, hasBackend, hasMap } from "./config.js";
+import { KAKAO_JS_KEY, hasBackend, hasMap, hasGallery } from "./config.js";
 import { regionByCode, THEMES } from "./regions.js";
 import { loadKakao, kakaoReady, createMap } from "./kakaomap.js";
 import { searchByKeyword, searchByAddress, looksLikeAddress,
@@ -23,6 +23,7 @@ import { createStore, peekRoom, resumeRoom, setRoomPassword, deleteRoom } from "
 import { currentUser } from "./auth.js";
 import { settle } from "./settle.js";
 import { buildItinerary, enumerateDays } from "./route.js";
+import { prepare, prettyBytes, canResize } from "./photo.js";
 import { slugFromUrl, getToken, setToken, clearToken, rememberRoom,
          getNick, setNick } from "./session.js";
 
@@ -35,7 +36,7 @@ const state = { places: [], counts: {}, mine: [], expenses: [], itinerary: [],
                 comments: [], loaded: false, updatedAt: null };
 
 const maps = { stay: null, food: null };
-const inited = { stay: false, food: false, money: false, plan: false };
+const inited = { stay: false, food: false, money: false, plan: false, photo: false };
 let selectedId = { stay: null, food: null };
 let foodCat = "all";
 
@@ -236,7 +237,7 @@ function redrawAll() {
 /* ============================================================
    4. 탭
    ============================================================ */
-const TABS = ["stay", "food", "plan", "money"];
+const TABS = ["stay", "food", "plan", "money", "photo"];
 
 function showTab(name) {
   const tab = TABS.includes(name) ? name : "stay";
@@ -246,6 +247,7 @@ function showTab(name) {
   if (tab === "food" && !inited.food) initFood();
   if (tab === "money" && !inited.money) initMoney();
   if (tab === "plan" && !inited.plan) initPlan();
+  if (tab === "photo" && !inited.photo) initPhoto();
   // 숨어 있던 지도는 보일 때 다시 그려야 합니다
   if (maps[tab]) maps[tab].refresh();
 }
@@ -802,6 +804,196 @@ function makeAdder({ slot, kind, mapKey, label }) {
     startPick("지도를 눌러 위치를 정해주세요.");
   });
 }
+
+/* ============================================================
+   사진 갤러리
+
+   ★ 사진은 이 서비스에서 되돌리기가 가장 어려운 기능입니다.
+     용량이 진짜 비용이고, 얼굴·위치 같은 민감한 게 담기고,
+     한 번 퍼진 링크는 회수가 안 됩니다.
+
+     그래서 올리기 전에 반드시 줄입니다 — 전송량이 20분의 1이 되고,
+     무엇보다 사진에 박힌 촬영 위치(GPS)가 그 과정에서 지워집니다.
+     숙소에서 찍은 사진을 그대로 올리면 숙소 좌표가 공개됩니다.
+   ============================================================ */
+let gallery = { photos: [], comments: [], cap: 300, used: 0, local: false };
+
+function initPhoto() {
+  if (inited.photo) return;
+  inited.photo = true;
+
+  $("#photo-input").addEventListener("change", onPickPhotos);
+
+  $("#photo-grid").addEventListener("click", (ev) => {
+    const cell = ev.target.closest("[data-ph]");
+    if (cell) openPhoto(cell.dataset.ph);
+  });
+
+  $("#photo-del").addEventListener("click", onDeletePhoto);
+
+  loadGallery();
+}
+
+async function loadGallery() {
+  try {
+    gallery = await store.photoList();
+  } catch (e) {
+    $("#photo-error").textContent = e.message || "사진을 불러오지 못했어요";
+    return;
+  }
+  renderGallery();
+}
+
+function renderGallery() {
+  const list = gallery.photos || [];
+  $("#photo-empty").hidden = list.length > 0;
+  $("#photo-left").textContent = list.length
+    ? `${list.length}장 / ${gallery.cap}장`
+    : "";
+
+  /* 저장소가 연결 안 됐으면 솔직하게 알려줍니다 */
+  $("#photo-intro").innerHTML = gallery.local
+    ? "⚠️ <strong>사진 보관함이 아직 연결되지 않았어요.</strong> "
+      + "지금 올리는 사진은 <strong>이 브라우저에만</strong> 저장되고 친구들에게는 안 보여요."
+    : "여행 사진을 모아두는 곳이에요. 올릴 때 <strong>자동으로 줄이고</strong> "
+      + "사진에 박힌 <strong>촬영 위치 정보를 지웁니다.</strong>";
+  $("#photo-warn").hidden = gallery.local || !list.length;
+
+  $("#photo-grid").innerHTML = list.map((p) => {
+    const n = (gallery.comments || []).filter((c) => c.target_id === p.id).length;
+    return `
+      <button type="button" class="photo-cell" data-ph="${esc(p.id)}"
+              aria-label="${esc(p.caption || "사진")} 크게 보기">
+        <img src="${esc(store.photoUrl(p.thumb))}" alt="${esc(p.caption || "")}" loading="lazy">
+        ${n ? `<span class="n">💬 ${n}</span>` : ""}
+      </button>`;
+  }).join("");
+}
+
+async function onPickPhotos(ev) {
+  const files = [...(ev.target.files || [])];
+  ev.target.value = "";                    /* 같은 파일을 다시 골라도 동작하게 */
+  if (!files.length) return;
+
+  const err = (m) => { $("#photo-error").textContent = m || ""; };
+  const say = (m) => { $("#photo-status").textContent = m || ""; };
+  err("");
+
+  if (!canResize()) {
+    return err("이 브라우저에서는 사진 올리기를 쓸 수 없어요");
+  }
+
+  let done = 0, saved = 0;
+  for (const file of files) {
+    say(`${done + 1}/${files.length}번째 사진을 줄이는 중…`);
+    try {
+      const got = await prepare(file);
+      saved += Math.max(0, file.size - got.full.size);
+      say(`${done + 1}/${files.length}번째 사진을 올리는 중…`);
+      await store.photoUpload({
+        full: got.full, thumb: got.thumb,
+        width: got.width, height: got.height,
+        nick: getNick(slug) || null,
+      });
+      done++;
+    } catch (e) {
+      err(`${file.name}: ${e.message || "올리지 못했어요"}`);
+      break;
+    }
+  }
+
+  await loadGallery();
+  say(done
+    ? `${done}장 올렸어요. 용량을 ${prettyBytes(saved)} 줄였어요.`
+    : "");
+}
+
+/* ---------- 크게 보기 ---------- */
+let viewing = null;
+
+function openPhoto(id) {
+  const p = (gallery.photos || []).find((x) => x.id === id);
+  if (!p) return;
+  viewing = p;
+
+  $("#photo-big").src = store.photoUrl(p.key);
+  $("#photo-big").alt = p.caption || "여행 사진";
+  $("#photo-cap").textContent = [p.caption, p.nick && `— ${p.nick}`]
+    .filter(Boolean).join(" ");
+  $("#photo-del").hidden = !p.mine;
+
+  renderPhotoComments();
+  $("#photo-view").showModal();
+}
+
+function renderPhotoComments() {
+  if (!viewing) return;
+  const list = (gallery.comments || []).filter((c) => c.target_id === viewing.id);
+  $("#photo-cmts").innerHTML = `
+    <ul class="cmt-list">
+      ${list.map((c) => `
+        <li data-cid="${esc(c.id)}">
+          <span class="cmt-nick">${esc(c.nick)}</span>
+          <span class="cmt-body">${esc(c.body)}</span>
+          ${c.mine ? `<button type="button" class="cmt-del" data-pcdel="${esc(c.id)}"
+                              aria-label="내 댓글 지우기">×</button>` : ""}
+        </li>`).join("")}
+    </ul>
+    <div class="cmt-form" id="photo-cmt-form">
+      <input class="cmt-input" type="text" maxlength="500" placeholder="한마디 남기기">
+      <button type="button" class="btn-quiet" id="photo-cmt-go">등록</button>
+    </div>`;
+
+  /* ★ 여기는 <form> 이 아니라 <div> 입니다.
+
+     크게 보기 상자가 <form method="dialog"> 라서, 그 안에 또 <form>
+     을 넣으면 HTML 규칙 위반입니다. 브라우저는 오류를 내지 않고
+     안쪽 form 태그를 조용히 버립니다. 그래서 id 로 찾으면 null 이
+     나오고, "왜 없지?" 하게 됩니다. 실제로 그걸로 한참 헤맸습니다. */
+  $("#photo-cmt-go").addEventListener("click", async (ev) => {
+    ev.preventDefault();
+    const input = $("#photo-cmt-form .cmt-input");
+    const body = input.value.trim();
+    if (!body || !viewing) return;
+    const nick = ensureNick();
+    if (!nick) return;
+    try {
+      await store.commentAdd({ targetType: "photo", targetId: viewing.id, body, nick });
+      input.value = "";
+      await loadGallery();
+      renderPhotoComments();
+    } catch (e) {
+      toast(e.message || "남기지 못했어요");
+    }
+  });
+
+  $("#photo-cmts").addEventListener("click", async (ev) => {
+    const del = ev.target.closest("[data-pcdel]");
+    if (!del) return;
+    if (!confirm("이 댓글을 지울까요?")) return;
+    try {
+      await store.commentRemove(del.dataset.pcdel);
+      await loadGallery();
+      renderPhotoComments();
+    } catch (e) {
+      toast(e.message || "지우지 못했어요");
+    }
+  }, { once: true });
+}
+
+async function onDeletePhoto() {
+  if (!viewing) return;
+  if (!confirm("이 사진을 지울까요?")) return;
+  try {
+    await store.photoRemove(viewing.id);
+    $("#photo-view").close();
+    viewing = null;
+    await loadGallery();
+  } catch (e) {
+    toast(e.message || "지우지 못했어요");
+  }
+}
+
 
 /* ============================================================
    댓글 — 숙소·맛집 카드마다
