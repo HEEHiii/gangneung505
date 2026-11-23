@@ -854,8 +854,10 @@ function renderGallery() {
 
   /* 저장소가 연결 안 됐으면 솔직하게 알려줍니다 */
   $("#photo-intro").innerHTML = gallery.local
-    ? "⚠️ <strong>사진 보관함이 아직 연결되지 않았어요.</strong> "
-      + "지금 올리는 사진은 <strong>이 브라우저에만</strong> 저장되고 친구들에게는 안 보여요."
+    ? "⚠️ <strong>사진 보관함이 아직 연결되지 않았어요.</strong>"
+      + (gallery.note
+          ? ` ${esc(gallery.note)}`
+          : " 지금 올리는 사진은 <strong>이 브라우저에만</strong> 저장되고 친구들에게는 안 보여요.")
     : "여행 사진을 모아두는 곳이에요. 올릴 때 <strong>자동으로 줄이고</strong> "
       + "사진에 박힌 <strong>촬영 위치 정보를 지웁니다.</strong>";
 

@@ -221,6 +221,7 @@ export function createStore(slug) {
 
   /* 사진 보관함이 연결돼 있는지. null = 아직 안 물어봄 */
   let galleryReady = null;
+  let galleryNote = "";
   const voter = voterKey(slug);
   const online = hasBackend();
   let token = null;
@@ -647,14 +648,40 @@ export function createStore(slug) {
               return { ...got, local: false };
             }
           }
-          /* 503(열쇠 없음)·404(함수 없음)이면 연결 안 된 것입니다 */
-          if (res.status === 503 || res.status === 404) galleryReady = false;
+          /* 왜 안 됐는지 남깁니다 — 화면이 사람 말로 보여줍니다 */
+          galleryReady = false;
+          if (res.status === 404) {
+            galleryNote = `사진 함수 "${PHOTO_FN}" 를 찾지 못했어요 `
+                        + "(Supabase 주소창의 /functions/<이름>/details 와 맞는지 확인해주세요)";
+          } else if (res.status === 401) {
+            galleryNote = `사진 함수가 막혀 있어요 `
+                        + `(Edge Functions → ${PHOTO_FN} → Verify JWT 를 꺼주세요)`;
+          } else if (res.status === 503) {
+            galleryNote = "사진함이 아직 준비되지 않았어요 (0009_photo_bucket.sql 을 돌려주세요)";
+          } else {
+            galleryNote = `사진 보관함에 연결하지 못했어요 (${res.status})`;
+          }
         } catch (_) {
           galleryReady = false;
+          galleryNote = "사진 보관함에 닿지 못했어요 "
+                      + `(${PHOTO_FN} 의 Verify JWT 를 끄거나 함수 이름을 확인해주세요)`;
         }
       }
 
-      /* 이 브라우저에만 저장하는 모드 */
+      /* ★ 서버에 방이 있는데 사진 함수만 안 되는 경우.
+
+         전에는 여기서 로컬 저장소를 뒤지다 "이 브라우저에 저장된
+         방이 없어요" 라고 했습니다. 서버 모드에서는 당연히 없는데,
+         그 말을 들으면 사진이 아니라 방이 문제인 줄 알게 됩니다.
+         진짜 이유를 그대로 돌려줍니다. */
+      if (online) {
+        return {
+          photos: [], comments: [], cap: 0, used: 0,
+          local: true, note: galleryNote,
+        };
+      }
+
+      /* 서버 자체를 안 쓰는 모드 — 이 브라우저에만 저장합니다 */
       const box = lread(slug);
       if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
       const alive = (box.photos || []).filter((p) => !p.deleted_at);
@@ -676,7 +703,12 @@ export function createStore(slug) {
     async photoUpload({ full, thumb, width, height, caption, nick }) {
       need();
 
-      if (!online || galleryReady === false) {
+      if (online && galleryReady === false) {
+        throw new RpcError("setup",
+          galleryNote || "사진 보관함이 아직 연결되지 않았어요", "no gallery");
+      }
+
+      if (!online) {
         /* 이 브라우저에만 — 미리보기용으로 data URL 로 들고 있습니다 */
         const box = lread(slug);
         if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
@@ -751,7 +783,7 @@ export function createStore(slug) {
 
     async photoRemove(id) {
       need();
-      if (!online || galleryReady === false) {
+      if (!online) {
         const box = lread(slug);
         if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
         const ph = (box.photos || []).find((p) => p.id === id && !p.deleted_at);
