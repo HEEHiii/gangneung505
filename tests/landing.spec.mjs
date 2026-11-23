@@ -444,9 +444,11 @@ console.log("── 테마 고르기 탭 영역");
 {
   console.log("── 시험용 로그인 수단");
 
+  /* ★ 기본값을 여기서 못박습니다. config.js 의 실제 값을 그대로 쓰면,
+     사장님이 로그인 수단을 바꾸는 날 이 검사가 엉뚱하게 깨집니다. */
   const noteFor = async (query) => {
     const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
-    await stubConfig(ctx, FAKE_SUPABASE);
+    await stubConfig(ctx, { ...FAKE_SUPABASE, LOGIN_PROVIDER: "github" });
     const page = await ctx.newPage();
     await page.goto(`${BASE}/app/index.html${query}`);
     await page.waitForFunction(() => window.__landingReady === true, { timeout: 10000 });

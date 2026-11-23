@@ -67,7 +67,7 @@ export const KAKAO_JS_KEY = "e23289f2dcaab6a5e4a84be7808dadf5";
     구글은 Google Cloud 에서 OAuth 클라이언트를 따로 만들어야 하고,
     깃허브는 저장소 계정만 있으면 3분이면 됩니다.)
    ------------------------------------------------------------ */
-export const LOGIN_PROVIDER = "github";
+export const LOGIN_PROVIDER = "kakao";
 
 
 /* ------------------------------------------------------------
