@@ -426,6 +426,11 @@ console.log("── 테마 고르기 탭 영역");
   eq(errors.length, 0,
     `통계 때문에 콘솔 오류가 나지 않는다${errors.length ? " — " + errors[0] : ""}`);
 
+  /* ★ 로그인하지 않은 상태에서 로그아웃 버튼이 보이면 안 됩니다.
+     눌러도 아무 일이 안 일어나는 버튼은 "고장났나?" 로 읽힙니다. */
+  eq(await page.locator("#signout").isVisible(), false,
+    "★ 로그인하지 않았으면 로그아웃 버튼이 안 보인다");
+
   await ctx.close();
 }
 

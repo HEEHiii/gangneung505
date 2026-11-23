@@ -276,7 +276,18 @@ async function showMyRooms() {
     rooms = recentRooms().map((r) => ({ slug: r.slug, title: r.title, recent: true }));
   }
 
-  if (!rooms.length) { box.hidden = true; return; }
+  /* ★ 로그아웃은 "서버에 로그인한 상태"일 때만 의미가 있습니다.
+     이 브라우저에서 열어본 방 목록은 로그인과 무관하므로,
+     그때 로그아웃 버튼을 보여주면 눌러도 아무 일이 안 일어납니다. */
+  $("#signout").hidden = !fromServer;
+
+  if (!rooms.length) {
+    // 로그인은 했는데 만든 방이 없는 경우 — 나갈 길은 남겨둡니다
+    box.hidden = !fromServer;
+    list.innerHTML = "";
+    note.textContent = fromServer ? "아직 만든 방이 없어요." : "";
+    return;
+  }
 
   box.hidden = false;
   list.innerHTML = rooms.map((r) => `
@@ -441,6 +452,14 @@ async function boot() {
     showError("비밀번호만 다시 넣어주세요. 로그인은 끝났어요.");
     $("#f-pw").focus();
   }
+
+  /* 로그아웃 — 다른 계정으로 들어가 볼 때도 씁니다.
+     주소(?login=…)는 그대로 두고 새로고침하므로, 로그아웃한 뒤
+     바로 그 수단으로 다시 로그인하게 됩니다. */
+  $("#signout").addEventListener("click", async () => {
+    await signOut();
+    location.reload();
+  });
 
   showMyRooms();
   showUsage();            // 방장에게만, 실패하면 조용히 사라집니다
