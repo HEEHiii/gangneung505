@@ -1056,9 +1056,33 @@ console.log("── 사진 갤러리");
     "사진에 댓글을 달 수 있다");
   ok((await page.locator("#photo-cmts").textContent()).includes("민수"), "별명이 보인다");
 
+  /* ★ 엔터로도 달려야 합니다.
+
+     이 칸은 <form method="dialog"> 안에 있어서, 가로채지 않으면
+     엔터가 "상자 닫기" 로 처리됩니다. 댓글을 쓰려다 사진이
+     닫히는 거라, 실제로 겪으면 꽤 당황스럽습니다. */
+  await page.locator("#photo-cmt-form .cmt-input").fill("엔터로 남긴 댓글");
+  await page.locator("#photo-cmt-form .cmt-input").press("Enter");
+  await page.waitForTimeout(800);
+
+  eq(await page.locator("#photo-view").isVisible(), true,
+    "★ 엔터를 눌러도 사진이 닫히지 않는다");
+  ok((await page.locator("#photo-cmts").textContent()).includes("엔터로 남긴 댓글"),
+    "★ 엔터로 댓글이 달린다");
+  eq(await page.locator("#photo-cmts .cmt-list li").count(), 2, "댓글이 2개가 된다");
+  eq(await page.locator("#photo-cmt-form .cmt-input").inputValue(), "",
+    "보내고 나면 칸이 비워진다");
+
+  /* 빈 칸에서 엔터를 눌러도 닫히면 안 됩니다 */
+  await page.locator("#photo-cmt-form .cmt-input").press("Enter");
+  await page.waitForTimeout(300);
+  eq(await page.locator("#photo-view").isVisible(), true,
+    "빈 칸에서 엔터를 눌러도 닫히지 않는다");
+  eq(await page.locator("#photo-cmts .cmt-list li").count(), 2, "빈 댓글은 안 달린다");
+
   await page.locator("#photo-view button[type=submit]").click();
   await page.waitForTimeout(300);
-  ok((await page.locator(".photo-cell").first().textContent()).includes("1"),
+  ok((await page.locator(".photo-cell").first().textContent()).includes("2"),
     "목록에 댓글 개수가 보인다");
 
   /* 새로고침해도 남아 있는가 */

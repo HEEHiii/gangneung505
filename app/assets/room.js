@@ -969,8 +969,7 @@ function renderPhotoComments() {
      을 넣으면 HTML 규칙 위반입니다. 브라우저는 오류를 내지 않고
      안쪽 form 태그를 조용히 버립니다. 그래서 id 로 찾으면 null 이
      나오고, "왜 없지?" 하게 됩니다. 실제로 그걸로 한참 헤맸습니다. */
-  $("#photo-cmt-go").addEventListener("click", async (ev) => {
-    ev.preventDefault();
+  const send = async () => {
     const input = $("#photo-cmt-form .cmt-input");
     const body = input.value.trim();
     if (!body || !viewing) return;
@@ -981,9 +980,31 @@ function renderPhotoComments() {
       input.value = "";
       await loadGallery();
       renderPhotoComments();
+      /* 다시 그렸으니 다음 댓글을 바로 칠 수 있게 */
+      const again = $("#photo-cmt-form .cmt-input");
+      if (again) again.focus();
     } catch (e) {
       toast(e.message || "남기지 못했어요");
     }
+  };
+
+  $("#photo-cmt-go").addEventListener("click", (ev) => {
+    ev.preventDefault();
+    send();
+  });
+
+  /* ★ 엔터로도 보내집니다.
+
+     이 칸은 <form method="dialog"> 안에 있어서, 엔터를 누르면
+     브라우저가 "그 폼을 제출" 한 것으로 보고 상자를 닫아버립니다.
+     댓글을 쓰려다 사진이 닫히는 겁니다. 그래서 엔터를 가로챕니다.
+
+     (숙소·맛집 카드의 댓글은 진짜 <form> 이라 엔터가 원래 됩니다.
+      여기만 상자 안이라 다릅니다) */
+  $("#photo-cmt-form .cmt-input").addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter" || ev.isComposing) return;
+    ev.preventDefault();       // 상자가 닫히지 않게
+    send();
   });
 
   $("#photo-cmts").addEventListener("click", async (ev) => {
