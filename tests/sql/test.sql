@@ -989,6 +989,59 @@ select pg_temp.ok(
 
 
 -- ============================================================
+--  9.11 토큰을 쓰는 함수는 stable 이면 안 된다
+--
+--  ★ 실제로 겪은 일입니다.
+--
+--    photo_list 를 "읽기만 하니까" 하고 stable 로 선언했습니다.
+--    그런데 PostgREST 는 stable 함수를 "읽기 전용 트랜잭션"으로
+--    돌립니다. app.room_from_token 은 안에서 마지막 사용 시각을
+--    기록하므로 거기서 터집니다:
+--      cannot execute UPDATE in a read-only transaction
+--
+--    더 나쁜 건 그 오류가 화면에 "다시 입장해주세요" 로 둔갑한
+--    것입니다. 사용자는 토큰이 문제인 줄 알고 몇 번씩 다시
+--    입장하게 됩니다. psql 로 직접 부르면 멀쩡해서 더 찾기
+--    어렵습니다 (psql 은 읽기 전용이 아니니까요).
+--
+--    그래서 "토큰을 쓰는데 stable 인 함수"가 하나라도 있으면
+--    여기서 막습니다.
+-- ============================================================
+\echo '── 9.11 토큰 쓰는 함수의 volatility'
+reset role;
+
+do $$
+declare
+  r record;
+  v_bad text := '';
+begin
+  for r in
+    select p.proname, p.provolatile
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.prokind = 'f'                                  -- 보통 함수만 (집계 제외)
+       and p.provolatile in ('s', 'i')                      -- stable / immutable
+       and pg_get_functiondef(p.oid) like '%room_from_token%'
+  loop
+    v_bad := v_bad || r.proname || ' ';
+  end loop;
+
+  if v_bad = '' then
+    raise notice '  OK    ★ 토큰을 쓰는 함수 중 stable 인 것이 없다';
+  else
+    raise exception 'FAIL: stable 인데 토큰을 쓰는 함수: % (PostgREST 가 읽기 전용으로 돌려 터집니다)', v_bad;
+  end if;
+end $$;
+
+-- photo_list 가 읽기 전용 트랜잭션에서도 터지지 않는지 직접 확인
+select pg_temp.ok(
+  (select provolatile from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'photo_list') = 'v',
+  'photo_list 는 volatile 이다 (PostgREST 가 읽기·쓰기로 돌립니다)');
+
+
+-- ============================================================
 --  10. 방 삭제는 자식까지 함께
 -- ============================================================
 \echo '── 10. 방 삭제'

@@ -228,7 +228,17 @@ $$;
 create or replace function public.photo_list(p_token text, p_voter text)
 returns jsonb
 language plpgsql
-stable
+-- ★ stable 로 두면 안 됩니다.
+--
+--   읽기만 하는 함수처럼 보여서 처음에 stable 을 붙였는데,
+--   PostgREST 는 stable 함수를 "읽기 전용 트랜잭션" 으로 돌립니다.
+--   그런데 app.room_from_token 이 안에서 "마지막 사용 시각"을
+--   기록하므로 거기서 터집니다:
+--     cannot execute UPDATE in a read-only transaction
+--
+--   그리고 그 오류가 화면에는 "다시 입장해주세요" 로 둔갑해서,
+--   사용자는 토큰이 문제인 줄 알고 몇 번씩 다시 입장하게 됩니다.
+--   psql 로 직접 부르면 멀쩡해서 더 찾기 어렵습니다.
 security definer
 set search_path = ''
 as $$
