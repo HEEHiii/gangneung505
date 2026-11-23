@@ -117,7 +117,7 @@ export const RESOLVE_FN = "resolve-link-ts";
      돕니다. 혼자 눌러볼 수는 있지만 친구에게는 안 보이고
      30장까지이며, 화면에 그렇게 적힙니다.
    ------------------------------------------------------------ */
-export const PHOTO_FN = "photo-upload-url";
+export const PHOTO_FN = "photo-upload-url-index-ts";
 
 
 /* ============================================================
