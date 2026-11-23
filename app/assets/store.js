@@ -639,7 +639,7 @@ export function createStore(slug) {
               apikey: SUPABASE_ANON_KEY,
               authorization: `Bearer ${SUPABASE_ANON_KEY}`,
             },
-            body: JSON.stringify({ mode: "view", token: need() }),
+            body: JSON.stringify({ mode: "view", token: need(), voter }),
           });
           if (res.ok) {
             const got = await res.json();

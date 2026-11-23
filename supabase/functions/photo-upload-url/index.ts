@@ -57,9 +57,18 @@ Deno.serve(async (req) => {
                   message: "사진 보관함이 아직 준비되지 않았어요" }, 503);
   }
 
-  let body: { mode?: string; token?: string; bytes?: number; thumbBytes?: number };
+  let body: { mode?: string; token?: string; voter?: string;
+              bytes?: number; thumbBytes?: number };
   try { body = await req.json(); } catch { return json({ ok: false, code: "bad" }, 400); }
   const token = String(body.token || "");
+
+  /* ★ 누가 보고 있는지 그대로 넘깁니다.
+
+     전에는 p_voter 에 빈 문자열을 넣었습니다. 주소만 만들면 되니까
+     필요 없다고 봤는데, photo_list 는 그 값으로 "내가 올린 사진인가"
+     (mine) 를 정합니다. 빈 값이면 모든 사진이 남의 것이 되고,
+     그래서 자기가 올린 사진에도 지우기 버튼이 안 나왔습니다. */
+  const voter = String(body.voter || "");
 
   /* 방 토큰으로 DB 에 묻습니다 (손님 자격으로) */
   const rpc = async (fn: string, args: unknown) => {
@@ -85,7 +94,7 @@ Deno.serve(async (req) => {
 
   /* ================= 보기 ================= */
   if (body.mode === "view") {
-    const got = await rpc("photo_list", { p_token: token, p_voter: "" });
+    const got = await rpc("photo_list", { p_token: token, p_voter: voter });
 
     /* ★ 왜 실패했는지 구분해서 말합니다.
 

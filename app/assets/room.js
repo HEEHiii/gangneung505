@@ -940,6 +940,11 @@ function openPhoto(id) {
     .filter(Boolean).join(" ");
   $("#photo-del").hidden = !p.mine;
   $("#photo-save").hidden = !p.url;
+  /* 폰에서는 공유 시트가 뜨므로 "저장" 보다 넓은 말이 맞습니다 */
+  $("#photo-save").textContent =
+    (navigator.canShare && navigator.canShare({ files: [] }) !== undefined
+      && /iPhone|iPad|Android/i.test(navigator.userAgent))
+      ? "저장 · 보내기" : "사진 저장";
 
   renderPhotoComments();
 
@@ -1036,24 +1041,55 @@ function renderPhotoComments() {
   }, { once: true });
 }
 
-/* ★ 사진을 폰에 저장하기
+/* ★ 사진을 폰에 저장하기 / 보내기
 
    주소가 한 시간 뒤에 죽기 때문에 "주소를 복사해 두기"는 안 되지만,
-   사진 자체를 받아두는 건 당연히 됩니다. 밖으로 보내고 싶으면
-   저장해서 파일로 보내면 됩니다.
+   사진 자체를 받아두는 건 당연히 됩니다.
 
-   주소가 우리 도메인이 아니라서 <a download> 만으로는 저장이 안 되고
-   새 탭으로 열립니다. 그래서 직접 받아서 저장합니다. */
+   ★ 아이폰에서는 <a download> 로 사진첩에 저장되지 않습니다.
+     iOS 사파리는 그 방식을 제대로 지원하지 않아서, 눌러도 아무
+     일이 안 일어나거나 파일 앱에만 들어갑니다. 실제로 사장님이
+     "저장이 안 된다" 고 하셨습니다.
+
+     대신 공유 시트를 띄우면 거기에 "이미지 저장" 이 있고, 그게
+     사진첩으로 들어갑니다. 카톡으로 바로 보내기도 같은 자리에
+     있어서 오히려 더 쓸모 있습니다.
+
+   데스크톱에는 파일 공유가 없는 브라우저가 많으므로 내려받기로
+   물러납니다. */
 async function onSavePhoto() {
   if (!viewing || !viewing.url) return;
+
+  const name = `${(room && room.title) || "여행"}-${viewing.id.slice(0, 6)}.webp`;
+
+  let blob;
   try {
     const res = await fetch(viewing.url);
     if (!res.ok) throw new Error("받지 못했어요");
-    const blob = await res.blob();
+    blob = await res.blob();
+  } catch (_) {
+    toast("사진을 받지 못했어요. 사진을 길게 눌러 저장해보세요");
+    return;
+  }
+
+  /* 폰: 공유 시트 → "이미지 저장" 이 사진첩으로 넣어줍니다 */
+  try {
+    const file = new File([blob], name, { type: blob.type || "image/webp" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === "AbortError") return;      // 사용자가 취소
+    /* 공유가 안 되면 아래 내려받기로 */
+  }
+
+  /* 데스크톱: 내려받기 */
+  try {
     const href = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = href;
-    a.download = `${(room && room.title) || "여행"}-${viewing.id.slice(0, 6)}.webp`;
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     a.remove();

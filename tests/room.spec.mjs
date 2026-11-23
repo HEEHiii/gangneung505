@@ -12,7 +12,7 @@ const { chromium } = createRequire(import.meta.url)("playwright");
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { stubConfig } from "./stub-config.mjs";
+import { stubConfig, FAKE_SUPABASE } from "./stub-config.mjs";
 import { gpsJpegBytes } from "./fixtures/gps-jpeg.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -1263,6 +1263,67 @@ console.log("── 사진 — 올린 사람만 지우기");
     `★ 버튼을 우회해도 막힌다  (${blocked})`);
 
   await a.ctx.close();
+}
+
+
+/* ============================================================
+   사진 함수가 "누가 보는지" 를 DB 에 넘기는가
+
+   ★ 실제로 겪은 버그입니다.
+
+     Edge Function 이 photo_list 를 부를 때 p_voter 에 빈 문자열을
+     넣었습니다. 주소만 만들면 되니 필요 없다고 봤는데, photo_list
+     는 그 값으로 "내가 올린 사진인가"(mine) 를 정합니다. 빈 값이면
+     모든 사진이 남의 것이 되고, 자기가 올린 사진에도 지우기 버튼이
+     안 나옵니다.
+
+     함수를 여기서 돌려볼 수는 없으므로, 클라이언트가 voter 를
+     실제로 보내는지와 함수 코드가 그걸 넘기는지를 각각 봅니다.
+   ============================================================ */
+console.log("── 사진 함수에 보는 사람 전달");
+{
+  const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
+  await stubConfig(ctx, FAKE_SUPABASE);
+  await ctx.addInitScript({ content: STUB });
+
+  let sent = null;
+  await ctx.route("**/functions/v1/**", async (route) => {
+    sent = JSON.parse(route.request().postData() || "{}");
+    await route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ ok: true, photos: [], comments: [], cap: 300, used: 0 }),
+    });
+  });
+  /* 방 입장·스냅샷은 가짜로 통과시킵니다 */
+  await ctx.route("**/rest/v1/rpc/**", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "{}" }));
+
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/app/room.html`);
+  const got = await page.evaluate(async () => {
+    const { createStore } = await import("/app/assets/store.js");
+    const s = createStore("B2C3D4F5G");
+    s.setToken("t".repeat(44));
+    await s.photoList();
+    return s.voter;
+  });
+
+  ok(sent && sent.mode === "view", "보기 요청을 보낸다");
+  ok(sent && typeof sent.voter === "string" && sent.voter.length > 0,
+    `★ 보는 사람(voter)을 함께 보낸다  (${sent && sent.voter ? sent.voter.slice(0, 12) + "…" : "안 보냄"})`);
+  eq(sent && sent.voter, got, "보낸 값이 이 브라우저의 투표자 식별자와 같다");
+  await ctx.close();
+}
+
+{
+  /* 함수 코드가 그 값을 DB 로 넘기는지 — 빈 문자열로 되돌아가면 잡습니다 */
+  const src = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)),
+         "..", "supabase", "functions", "photo-upload-url", "index.ts"), "utf8");
+  ok(/p_voter:\s*voter/.test(src),
+    "★ 함수가 photo_list 에 보는 사람을 넘긴다");
+  ok(!/p_voter:\s*""/.test(src),
+    "빈 문자열로 넘기지 않는다 (그러면 모든 사진이 남의 것이 됩니다)");
 }
 
 await browser.close();
