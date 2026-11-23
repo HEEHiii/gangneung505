@@ -934,8 +934,20 @@ function openPhoto(id) {
   if (!p) return;
   viewing = p;
 
-  $("#photo-big").src = p.url || "";
-  $("#photo-big").alt = p.caption || "여행 사진";
+  const img = $("#photo-big");
+
+  /* ★ 사진이 도착하기 전에 "자리"부터 잡아둡니다.
+
+     크기를 알려주지 않으면 도착 전 높이가 0 이라, 그 사이 댓글칸이
+     위로 올라왔다가 사진이 오면서 아래로 밀립니다. 그 움직임이
+     "사진을 눌렀는데 댓글창이 먼저 뜨는" 증상의 원인입니다.
+     비율을 미리 주면 레이아웃이 처음부터 그대로입니다. */
+  img.removeAttribute("style");
+  if (p.width && p.height) {
+    img.style.aspectRatio = `${p.width} / ${p.height}`;
+  }
+  img.src = p.url || "";
+  img.alt = p.caption || "여행 사진";
   $("#photo-cap").textContent = [p.caption, p.nick && `— ${p.nick}`]
     .filter(Boolean).join(" ");
   $("#photo-del").hidden = !p.mine;
@@ -961,8 +973,12 @@ function openPhoto(id) {
      상자 자체(tabindex="-1")에 포커스를 두고 맨 위로 올립니다. */
   const box = $("#photo-view .photo-box");
   if (box) box.focus({ preventScroll: true });
-  dlg.scrollTop = 0;
-  if (box) box.scrollTop = 0;
+
+  const toTop = () => { dlg.scrollTop = 0; if (box) box.scrollTop = 0; };
+  toTop();
+  /* 사진이 도착한 뒤에도 한 번 더 — 그때 높이가 바뀌기 때문입니다 */
+  img.addEventListener("load", toTop, { once: true });
+  img.addEventListener("error", toTop, { once: true });
 }
 
 function renderPhotoComments() {

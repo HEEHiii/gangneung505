@@ -1326,6 +1326,94 @@ console.log("── 사진 함수에 보는 사람 전달");
     "빈 문자열로 넘기지 않는다 (그러면 모든 사진이 남의 것이 됩니다)");
 }
 
+
+/* ============================================================
+   사진이 늦게 도착해도 사진부터 보인다
+
+   ★ 사장님이 두 번 말씀하신 증상입니다.
+
+     사진은 나중에 도착합니다. 그 전에는 사진 자리가 비어 있어서
+     댓글칸이 위로 올라와 있고, 사진이 도착하며 아래로 밀려날 때
+     브라우저가 "보던 것(댓글)"을 따라 같이 스크롤합니다.
+     그래서 사진은 화면 위로 사라지고 "한마디 남기기" 만 보입니다.
+
+     앞선 수정(포커스·scrollTop)만으로는 못 막습니다 — 그 시점엔
+     아직 사진이 안 왔으니까요. 느리게 오는 사진으로 확인합니다.
+   ============================================================ */
+console.log("── 사진이 늦게 와도 사진부터");
+{
+  const { ctx, page, errors } = await fresh();
+
+  await openRoom(page, await makeRoom(page, { title: "느린 사진" }));
+  await enter(page);
+  await page.click('#tabs a[data-tab="photo"]');
+  await page.waitForSelector("#panel-photo:not([hidden])", { timeout: 5000 });
+  await page.setInputFiles("#photo-input", {
+    name: "slow.jpg", mimeType: "image/jpeg", buffer: Buffer.from(gpsJpegBytes()),
+  });
+  await page.waitForTimeout(1800);
+
+  await page.locator(".photo-cell").first().click();
+
+  /* 열자마자, 그리고 사진이 도착한 뒤 — 두 시점 모두 확인합니다 */
+  const look = () => page.evaluate(() => {
+    const dlg = document.querySelector("#photo-view");
+    const img = document.querySelector("#photo-big");
+    const r = img.getBoundingClientRect();
+    const cmt = document.querySelector("#photo-cmt-form");
+    const cr = cmt ? cmt.getBoundingClientRect() : null;
+    return {
+      scroll: dlg.scrollTop,
+      imgTop: Math.round(r.top), imgH: Math.round(r.height),
+      cmtTop: cr ? Math.round(cr.top) : null,
+      loaded: img.complete && img.naturalWidth > 0,
+    };
+  });
+
+  await page.waitForTimeout(150);
+  const early = await look();
+  eq(early.scroll, 0, "열자마자 맨 위에 있다");
+  ok(early.imgTop < (early.cmtTop ?? 1e9),
+    `사진이 댓글칸보다 위에 있다  (사진 ${early.imgTop} / 댓글 ${early.cmtTop})`);
+
+  await page.waitForTimeout(600);
+  const late = await look();
+  ok(late.loaded, "사진이 도착했다");
+  eq(late.scroll, 0, "사진이 도착한 뒤에도 맨 위 그대로");
+  ok(late.imgTop >= -2, `사진 윗부분이 안 잘린다  (위 ${late.imgTop}px)`);
+  ok(late.imgH > 50, `사진이 제대로 자리를 차지한다  (높이 ${late.imgH}px)`);
+  ok(late.imgTop < late.cmtTop, "사진이 댓글칸보다 위에 있다");
+
+  /* ★ 여기서부터가 진짜 검사입니다.
+
+     이 브라우저에만 저장하는 모드에서는 사진이 data URL 이라 즉시
+     뜹니다. 그래서 "늦게 도착하는" 상황을 로컬에서는 만들 수
+     없습니다. 대신 그걸 막는 두 장치가 실제로 걸려 있는지 봅니다 —
+     장치가 사라지면 서버 모드에서 증상이 그대로 돌아옵니다. */
+  const guards = await page.evaluate(() => {
+    const dlg = document.querySelector("#photo-view");
+    const box = document.querySelector("#photo-view .photo-box");
+    const img = document.querySelector("#photo-big");
+    return {
+      anchorDlg: getComputedStyle(dlg).overflowAnchor,
+      anchorBox: getComputedStyle(box).overflowAnchor,
+      ratio: img.style.aspectRatio || "",
+      maxH: getComputedStyle(img).maxHeight,
+      fit: getComputedStyle(img).objectFit,
+    };
+  });
+  eq(guards.anchorDlg, "none",
+    "★ 상자에 '스크롤 따라가기' 가 꺼져 있다 (사진이 밀고 들어와도 안 따라감)");
+  eq(guards.anchorBox, "none", "안쪽에도 꺼져 있다");
+  ok(/^\d+\s*\/\s*\d+$/.test(guards.ratio),
+    `★ 사진 자리를 미리 잡아둔다  (비율 ${guards.ratio || "없음"})`);
+  ok(guards.maxH !== "none", `사진 높이가 화면에 맞게 묶여 있다  (${guards.maxH})`);
+  eq(guards.fit, "contain", "비율을 깨지 않고 맞춘다");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");
