@@ -231,6 +231,15 @@ export function createStore(slug) {
      그런데 확인을 빼면 로컬에서 비밀번호 게이트를 건너뛸 수 있게 되고,
      그러면 두 모드가 다르게 행동해서 게이트 흐름을 로컬에서 테스트할
      수 없습니다. 모양을 같게 유지하는 쪽이 이득이 큽니다. */
+  /* ★ 지울 수 있는가 — 서버와 같은 규칙을 씁니다.
+
+     서버는 "내가 올린 것이거나, 내가 방장이면" 지울 수 있습니다.
+     이 브라우저에만 저장하는 모드에서는 쓰는 사람이 곧 방장이므로
+     (lsnapshot 이 is_owner: true 로 돌려줍니다) 전부 지울 수 있는
+     게 맞습니다. 두 모드가 다르게 굴면 화면 코드가 어느 쪽에
+     맞춰야 할지 알 수 없게 됩니다. */
+  const canDropLocal = (by) => by === voter || true;   // 로컬에서는 늘 방장
+
   const need = () => {
     if (!token) throw new RpcError("expired", "다시 입장해주세요.", "no token");
     return token;
@@ -320,7 +329,7 @@ export function createStore(slug) {
         if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
         const p = box.places.find((x) => x.id === id && !x.deleted_at);
         if (!p) throw new RpcError("denied", "없는 장소예요", "miss");
-        if (p.created_by !== voter) {
+        if (!canDropLocal(p.created_by)) {
           throw new RpcError("denied", "직접 추가한 곳만 지울 수 있어요", "not mine");
         }
         p.deleted_at = new Date().toISOString();
@@ -398,7 +407,7 @@ export function createStore(slug) {
         if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
         const e = (box.expenses || []).find((x) => x.id === id && !x.deleted_at);
         if (!e) throw new RpcError("denied", "없는 지출이에요", "miss");
-        if (e.created_by !== voter) {
+        if (!canDropLocal(e.created_by)) {
           throw new RpcError("denied", "직접 적은 것만 지울 수 있어요", "not mine");
         }
         e.deleted_at = new Date().toISOString();
@@ -529,7 +538,7 @@ export function createStore(slug) {
         if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
         const c = (box.comments || []).find((x) => x.id === id && !x.deleted_at);
         if (!c) throw new RpcError("denied", "없는 댓글이에요", "miss");
-        if (c.voter_key !== voter) {
+        if (!canDropLocal(c.voter_key)) {
           throw new RpcError("denied", "직접 쓴 댓글만 지울 수 있어요", "not mine");
         }
         c.deleted_at = new Date().toISOString();
@@ -793,7 +802,7 @@ export function createStore(slug) {
         if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
         const ph = (box.photos || []).find((p) => p.id === id && !p.deleted_at);
         if (!ph) throw new RpcError("denied", "없는 사진이에요", "miss");
-        if (ph.created_by !== voter) {
+        if (!canDropLocal(ph.created_by)) {
           throw new RpcError("denied", "직접 올린 사진만 지울 수 있어요", "not mine");
         }
         ph.deleted_at = new Date().toISOString();

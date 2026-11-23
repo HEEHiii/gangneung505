@@ -1243,8 +1243,12 @@ console.log("── 사진 — 올린 사람만 지우기");
   /* 두 번째(친구 것)를 열어봅니다 */
   await a.page.locator(".photo-cell").nth(1).click();
   await a.page.waitForTimeout(400);
-  eq(await a.page.locator("#photo-del").isVisible(), false,
-    "★ 남이 올린 사진에는 '사진 지우기' 가 안 보인다");
+  /* ★ 이 브라우저에만 저장하는 모드에서는 쓰는 사람이 곧 방장이라,
+     친구가 올린 사진에도 버튼이 보이는 게 맞습니다. 방장이 아닌
+     친구에게 안 보이는 것은 서버 쪽 규칙이고 tests/sql/test.sql
+     9.9 가 지킵니다. */
+  eq(await a.page.locator("#photo-del").isVisible(), true,
+    "★ 방장이면 친구가 올린 사진도 지울 수 있다");
   eq(await a.page.locator("#photo-save").isVisible(), true,
     "그래도 저장은 할 수 있다");
 
@@ -1259,8 +1263,7 @@ console.log("── 사진 — 올린 사람만 지우기");
     try { await s.photoRemove("ph-someone-else"); return "지워짐"; }
     catch (e) { return e.message; }
   });
-  ok(/직접 올린/.test(blocked),
-    `★ 버튼을 우회해도 막힌다  (${blocked})`);
+  eq(blocked, "지워짐", `★ 방장이므로 실제로 지워진다  (${blocked})`);
 
   await a.ctx.close();
 }
@@ -1411,6 +1414,65 @@ console.log("── 사진이 늦게 와도 사진부터");
   eq(guards.fit, "contain", "비율을 깨지 않고 맞춘다");
 
   eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
+
+/* ============================================================
+   방장은 친구가 올린 것도 지울 수 있다
+
+   ★ 서버는 처음부터 방장에게 열어뒀는데(네 곳 모두), 화면이
+     "내 것" 일 때만 버튼을 보여줘서 그 권한을 쓸 수가 없었습니다.
+     열어둔 문 앞에 손잡이가 없던 셈입니다.
+
+   ★ 브라우저마다 다른 사람인 게 핵심입니다. 폰에서 올린 사진은
+     같은 사람이라도 컴퓨터에서는 "남의 것" 입니다. 방장이 아니면
+     자기가 올린 것도 다른 기기에서는 못 지웁니다 — 그게 익명을
+     지키는 대가이고, 방장만 예외입니다.
+   ============================================================ */
+console.log("── 방장은 친구 것도 지울 수 있다");
+{
+  const { ctx, page } = await fresh();
+  const url = await makeRoom(page, { title: "방장 권한" });
+  await openRoom(page, url);
+  await enter(page);
+
+  /* 친구가 올린 장소를 하나 만들어 둡니다 */
+  await page.click("#adder-stay summary");
+  await page.fill("#adder-stay .a-q", "https://map.kakao.com/link/map/친구숙소,37.8250,128.8780");
+  await page.click("#adder-stay .a-find");
+  await page.waitForTimeout(700);
+
+  const slug = new URL(url).searchParams.get("r").toUpperCase();
+  await page.evaluate((slug) => {
+    const key = `trip.local.${slug}`;
+    const box = JSON.parse(localStorage.getItem(key));
+    box.places[0].created_by = "다른-사람";      /* 남이 넣은 것으로 */
+    localStorage.setItem(key, JSON.stringify(box));
+  }, slug);
+
+  await page.reload();
+  await page.waitForFunction(() => window.__roomReady === true, { timeout: 8000 });
+  await page.waitForTimeout(500);
+
+  /* 이 브라우저에만 저장하는 모드에서는 내가 곧 방장입니다 */
+  const owner = await page.evaluate(() => {
+    const el = document.querySelector("#lodging-list .btn-del");
+    return { 버튼있음: !!el };
+  });
+  ok(owner.버튼있음,
+    "★ 방장에게는 친구가 올린 것에도 삭제 버튼이 보인다");
+
+  /* 누르면 "친구가 올린 것" 이라고 한 번 더 묻습니다 */
+  let asked = "";
+  page.once("dialog", async (d) => { asked = d.message(); await d.dismiss(); });
+  await page.locator("#lodging-list .btn-del").first().click();
+  await page.waitForTimeout(400);
+  ok(/친구가 올린 거예요/.test(asked),
+    `남의 것을 지울 때는 그렇게 알려준다  (${asked.replace(/\n/g, " ")})`);
+  eq(await page.locator("#lodging-list .card").count(), 1,
+    "취소하면 안 지워진다");
+
   await ctx.close();
 }
 

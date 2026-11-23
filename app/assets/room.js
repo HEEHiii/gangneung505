@@ -225,6 +225,34 @@ async function refresh(first = false) {
   }
 }
 
+/* ============================================================
+   누가 지울 수 있나
+
+   ★ 브라우저마다 다른 사람입니다.
+
+     친구들은 로그인을 하지 않으므로, 누가 누구인지 구분하는 건
+     브라우저에 저장된 표식뿐입니다. 그래서 폰에서 올린 사진은
+     같은 사람이라도 컴퓨터에서는 "남의 것" 입니다.
+     익명을 지키려고 치르는 대가이고, 바꾸려면 친구들도 로그인을
+     해야 합니다 — 그러면 아무도 안 들어옵니다.
+
+   ★ 다만 방장은 예외입니다.
+
+     서버는 처음부터 방장에게 전부 지울 수 있게 열어뒀는데
+     (place_remove · expense_remove · comment_remove · photo_remove
+      네 곳 모두), 화면이 "내 것" 일 때만 버튼을 보여줘서 그 권한을
+     쓸 수가 없었습니다. 열어둔 문 앞에 손잡이가 없던 셈입니다.
+   ============================================================ */
+const canDelete = (mine) => !!mine || !!(room && room.is_owner);
+
+/* 남의 것을 지울 때는 한 번 더 분명히 묻습니다 */
+const askDelete = (mine, what) =>
+  confirm(mine
+    ? `${what}을(를) 지울까요?`
+    /* 받침에 따라 "이에요/예요" 가 갈리므로 아예 붙이지 않습니다 */
+    : `친구가 올린 거예요.\n${what}을(를) 그래도 지울까요?`);
+
+
 function redrawAll() {
   renderLodgings();
   if (maps.stay) maps.stay.setLodgings(lodgings(), (id) => select("stay", id, false));
@@ -352,7 +380,7 @@ function renderLodgings() {
           <div class="card-actions">
             ${d.url ? `<a class="btn-link" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">보러가기 ↗</a>` : ""}
             <button class="btn-vote" type="button" data-vote="${esc(d.id)}"${state.loaded ? "" : " disabled"}>투표</button>
-            ${d.mine ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
+            ${canDelete(d.mine) ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
             <span class="vote-count" data-count="${esc(d.id)}"><strong>0</strong>표</span>
           </div>
           ${commentsHtml(d.id)}
@@ -421,7 +449,7 @@ function renderFood() {
             <div class="card-actions">
               ${d.url ? `<a class="btn-link" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">보러가기 ↗</a>` : ""}
               <button class="btn-vote" type="button" data-vote="${esc(d.id)}"${state.loaded ? "" : " disabled"}>투표</button>
-              ${d.mine ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
+              ${canDelete(d.mine) ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
               <span class="vote-count" data-count="${esc(d.id)}"><strong>0</strong>표</span>
             </div>
             ${commentsHtml(d.id)}
@@ -548,7 +576,7 @@ async function onVote(id) {
 async function onDelete(id, label) {
   const item = state.places.find((x) => x.id === id);
   if (!item) return;
-  if (!confirm(`"${item.name}" ${label}를 목록에서 지울까요?`)) return;
+  if (!askDelete(item.mine, `"${item.name}" ${label}`)) return;
 
   const before = [...state.places];
   state.places = state.places.filter((x) => x.id !== id);
@@ -950,7 +978,7 @@ function openPhoto(id) {
   img.alt = p.caption || "여행 사진";
   $("#photo-cap").textContent = [p.caption, p.nick && `— ${p.nick}`]
     .filter(Boolean).join(" ");
-  $("#photo-del").hidden = !p.mine;
+  $("#photo-del").hidden = !canDelete(p.mine);
   $("#photo-save").hidden = !p.url;
   /* 폰에서는 공유 시트가 뜨므로 "저장" 보다 넓은 말이 맞습니다 */
   $("#photo-save").textContent =
@@ -990,8 +1018,8 @@ function renderPhotoComments() {
         <li data-cid="${esc(c.id)}">
           <span class="cmt-nick">${esc(c.nick)}</span>
           <span class="cmt-body">${esc(c.body)}</span>
-          ${c.mine ? `<button type="button" class="cmt-del" data-pcdel="${esc(c.id)}"
-                              aria-label="내 댓글 지우기">×</button>` : ""}
+          ${canDelete(c.mine) ? `<button type="button" class="cmt-del" data-pcdel="${esc(c.id)}"
+                              aria-label="댓글 지우기">×</button>` : ""}
         </li>`).join("")}
     </ul>
     <div class="cmt-form" id="photo-cmt-form">
@@ -1117,7 +1145,7 @@ async function onSavePhoto() {
 
 async function onDeletePhoto() {
   if (!viewing) return;
-  if (!confirm("이 사진을 지울까요?")) return;
+  if (!askDelete(viewing.mine, "사진")) return;
   try {
     await store.photoRemove(viewing.id);
     $("#photo-view").close();
@@ -1158,8 +1186,8 @@ function commentsHtml(placeId) {
           <li data-cid="${esc(c.id)}">
             <span class="cmt-nick">${esc(c.nick)}</span>
             <span class="cmt-body">${esc(c.body)}</span>
-            ${c.mine ? `<button type="button" class="cmt-del" data-cdel="${esc(c.id)}"
-                                aria-label="내 댓글 지우기">×</button>` : ""}
+            ${canDelete(c.mine) ? `<button type="button" class="cmt-del" data-cdel="${esc(c.id)}"
+                                aria-label="댓글 지우기">×</button>` : ""}
           </li>`).join("")}
       </ul>
       <form class="cmt-form">
@@ -1508,7 +1536,7 @@ function initMoney() {
     const id = btn.dataset.id;
     const row = state.expenses.find((e) => e.id === id);
     if (!row) return;
-    if (!confirm(`"${row.item}" ${won(row.amount)}을 지울까요?`)) return;
+    if (!askDelete(row.mine, `"${row.item}" ${won(row.amount)}`)) return;
 
     btn.disabled = true;
     try {
@@ -1541,7 +1569,7 @@ function renderMoney() {
           <span class="ex-item">${esc(e.item)}</span>
           <span class="ex-payer">${esc(e.payer)}</span>
           <span class="ex-amount">${won(e.amount)}</span>
-          ${e.mine
+          ${canDelete(e.mine)
             ? `<button class="ex-del" type="button" data-id="${esc(e.id)}"
                        aria-label="${esc(e.item)} 지우기">×</button>`
             : `<span class="ex-del" aria-hidden="true"></span>`}
