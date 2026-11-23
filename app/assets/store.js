@@ -720,14 +720,22 @@ export function createStore(slug) {
           "slot");
       }
 
-      /* 2) R2 에 직접 올리기 — 우리 서버를 거치지 않습니다 */
+      /* 2) 저장소에 직접 올리기 — 이 과정은 우리 서버를 거치지 않습니다.
+            주소 안에 "이 자리에만, 잠깐만" 이라는 표가 들어 있습니다. */
       const put = async (url, blob) => {
         const res = await fetch(url, {
           method: "PUT",
-          headers: { "content-type": blob.type || "image/webp" },
+          headers: {
+            "content-type": blob.type || "image/webp",
+            /* 같은 자리에 두 번 올리는 것을 막습니다 (자리 이름이
+               매번 새로 생기므로 정상 경로에서는 겹칠 일이 없습니다) */
+            "x-upsert": "false",
+          },
           body: blob,
         });
-        if (!res.ok) throw new RpcError("upload", "사진을 올리지 못했어요", `r2 ${res.status}`);
+        if (!res.ok) {
+          throw new RpcError("upload", "사진을 올리지 못했어요", `storage ${res.status}`);
+        }
       };
       await put(slot.fullUrl, full);
       await put(slot.thumbUrl, thumb);

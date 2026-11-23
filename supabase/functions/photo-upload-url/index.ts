@@ -1,47 +1,39 @@
 /* ============================================================
    photo-upload-url — 사진 올릴 자리와 볼 주소를 내줍니다
 
-   브라우저가 Cloudflare R2 에 직접 올릴 수 있게, 짧은 시간만
-   유효한 주소(presigned URL)를 만들어 줍니다.
-
-   ★ 왜 우리 서버를 거치지 않는가
-
-   사진이 우리 서버를 지나가면 그만큼 전송량과 시간이 듭니다.
-   브라우저 → R2 로 바로 보내면 우리는 "자리만" 내주면 됩니다.
-
-   ★ R2 열쇠는 여기에만 있습니다
-
-   Supabase 의 Secrets 에 넣고 이 함수만 읽습니다. 브라우저에
-   내려보내면 누구나 우리 저장소에 아무거나 올릴 수 있게 됩니다.
-   그래서 열쇠 대신 "이 자리에, 10분 동안만" 올릴 수 있는 주소를
-   만들어 줍니다.
-
    ★ 사진은 비밀번호 뒤에 있습니다
 
-   버킷을 공개로 두면 사진 주소를 아는 사람은 비밀번호 없이도
-   볼 수 있고, 한 번 복사해 간 주소는 비밀번호를 바꿔도 계속
-   살아 있습니다. 그래서 버킷은 비공개로 두고, 방 토큰을 가진
-   사람에게만 "한 시간 동안만 유효한 주소"를 발급합니다.
+   사진함(버킷)을 공개로 두면 주소를 아는 사람은 비밀번호 없이도
+   볼 수 있고, 한 번 복사해 간 주소는 비밀번호를 바꿔도 계속 살아
+   있습니다. 그래서 비공개로 두고, 방에 들어온 사람에게만
+   "한 시간 동안만 유효한 주소"를 발급합니다.
 
-   사진 자체는 여전히 R2 에서 브라우저로 바로 갑니다. 우리 서버를
-   거치지 않으므로 느려지지도, 전송량을 먹지도 않습니다.
+   사진 자체는 Supabase 저장소에서 브라우저로 바로 갑니다.
+   이 함수를 거치지 않으므로 느려지지 않습니다. 이 함수는 주소만
+   만들어 줍니다.
 
-   ★ 올릴 자리 이름은 DB 가 정합니다
+   ★ 어떤 사진의 주소를 내줄지는 DB 가 정합니다
+
+   photo_list 가 "이 토큰의 방에 있는 사진"만 돌려주므로, 남의 방
+   사진 주소를 달라고 할 방법이 없습니다.
+
+   ★ 올릴 자리 이름도 DB 가 정합니다
 
    사용자가 정하게 하면 남의 방 자리 이름을 지어내 그 사진을
    덮어쓸 수 있습니다. photo_allow 가 방 토큰을 확인하고 그 방
    아래의 이름을 만들어 줍니다.
 
-   필요한 Secrets:
-     R2_ACCOUNT_ID       Cloudflare 계정 ID
-     R2_BUCKET           버킷 이름
-     R2_ACCESS_KEY_ID    S3 호환 토큰의 Access Key ID
-     R2_SECRET_KEY       S3 호환 토큰의 Secret
+   ★ 따로 넣을 열쇠가 없습니다
+
+   Supabase 가 이 함수에 SUPABASE_URL 과 SERVICE_ROLE_KEY 를
+   자동으로 넣어줍니다. 사장님이 설정할 게 없다는 뜻입니다.
+   service_role 키는 모든 잠금을 무시하므로 이 함수 밖으로
+   절대 나가면 안 됩니다 — 돌려주는 건 주소뿐입니다.
    ============================================================ */
 
+const BUCKET = "trip-photos";
+const VIEW_EXPIRES = 3600;                 // 보는 주소: 1시간
 const MAX_BYTES = 10 * 1024 * 1024;
-const EXPIRES = 600;            // 올릴 때 10분
-const VIEW_EXPIRES = 3600;      // 볼 때 1시간 — 그 뒤엔 주소가 죽습니다
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -53,114 +45,81 @@ const json = (body: unknown, status = 200) =>
     status, headers: { ...CORS, "content-type": "application/json" },
   });
 
-/* ---------- AWS SigV4 (R2 는 S3 호환이라 같은 방식입니다) ---------- */
-const enc = new TextEncoder();
-
-async function hmac(key: ArrayBuffer | Uint8Array, msg: string) {
-  const k = await crypto.subtle.importKey(
-    "raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  return await crypto.subtle.sign("HMAC", k, enc.encode(msg));
-}
-const hex = (buf: ArrayBuffer) =>
-  [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-
-async function sha256Hex(s: string) {
-  return hex(await crypto.subtle.digest("SHA-256", enc.encode(s)));
-}
-
-/* 쿼리로 서명한 주소를 만듭니다 (PUT = 올리기, GET = 보기) */
-async function presign(opts: {
-  method: "PUT" | "GET";
-  accountId: string; bucket: string; key: string;
-  accessKey: string; secretKey: string; expires: number;
-}) {
-  const host = `${opts.accountId}.r2.cloudflarestorage.com`;
-  const now = new Date();
-  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");   // 20260101T000000Z
-  const dateStamp = amzDate.slice(0, 8);
-  const scope = `${dateStamp}/auto/s3/aws4_request`;
-
-  const canonicalUri = `/${opts.bucket}/${opts.key.split("/").map(encodeURIComponent).join("/")}`;
-  const params = new URLSearchParams({
-    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
-    "X-Amz-Credential": `${opts.accessKey}/${scope}`,
-    "X-Amz-Date": amzDate,
-    "X-Amz-Expires": String(opts.expires),
-    "X-Amz-SignedHeaders": "host",
-  });
-  params.sort();
-
-  const canonical = [
-    opts.method, canonicalUri, params.toString(),
-    `host:${host}\n`, "host", "UNSIGNED-PAYLOAD",
-  ].join("\n");
-
-  const toSign = [
-    "AWS4-HMAC-SHA256", amzDate, scope, await sha256Hex(canonical),
-  ].join("\n");
-
-  let k: ArrayBuffer | Uint8Array = enc.encode(`AWS4${opts.secretKey}`);
-  for (const part of [dateStamp, "auto", "s3", "aws4_request"]) k = await hmac(k, part);
-  const signature = hex(await hmac(k, toSign));
-
-  return `https://${host}${canonicalUri}?${params.toString()}&X-Amz-Signature=${signature}`;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ ok: false, code: "method" }, 405);
 
-  const ACCOUNT = Deno.env.get("R2_ACCOUNT_ID") ?? "";
-  const BUCKET = Deno.env.get("R2_BUCKET") ?? "";
-  const AK = Deno.env.get("R2_ACCESS_KEY_ID") ?? "";
-  const SK = Deno.env.get("R2_SECRET_KEY") ?? "";
-  if (!ACCOUNT || !BUCKET || !AK || !SK) {
+  const URL_ = Deno.env.get("SUPABASE_URL") ?? "";
+  const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!URL_ || !SERVICE) {
     return json({ ok: false, code: "setup",
-                  message: "사진 보관함이 아직 연결되지 않았어요" }, 503);
+                  message: "사진 보관함이 아직 준비되지 않았어요" }, 503);
   }
 
   let body: { mode?: string; token?: string; bytes?: number; thumbBytes?: number };
   try { body = await req.json(); } catch { return json({ ok: false, code: "bad" }, 400); }
-
-  const SUPABASE_URL0 = Deno.env.get("SUPABASE_URL") ?? "";
-  const ANON0 = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
   const token = String(body.token || "");
 
-  const callRpc = async (fn: string, args: unknown) => {
-    const r = await fetch(`${SUPABASE_URL0}/rest/v1/rpc/${fn}`, {
+  /* 방 토큰으로 DB 에 묻습니다 (손님 자격으로) */
+  const rpc = async (fn: string, args: unknown) => {
+    const r = await fetch(`${URL_}/rest/v1/rpc/${fn}`, {
       method: "POST",
-      headers: { "content-type": "application/json", apikey: ANON0,
-                 authorization: `Bearer ${ANON0}` },
+      headers: { "content-type": "application/json", apikey: ANON,
+                 authorization: `Bearer ${ANON}` },
       body: JSON.stringify(args),
     });
     return { ok: r.ok, data: await r.json().catch(() => null) };
   };
 
-  /* ================= 보기 =================
-     ★ 어떤 사진의 주소를 내줄지는 DB 가 정합니다.
-       photo_list 가 "이 토큰의 방에 있는 사진"만 돌려주므로,
-       남의 방 사진 주소를 달라고 할 방법이 없습니다. */
+  /* 저장소는 service_role 로만 만집니다 */
+  const storage = async (path: string, payload: unknown) => {
+    const r = await fetch(`${URL_}/storage/v1/${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", apikey: SERVICE,
+                 authorization: `Bearer ${SERVICE}` },
+      body: JSON.stringify(payload),
+    });
+    return { ok: r.ok, status: r.status, data: await r.json().catch(() => null) };
+  };
+
+  /* ================= 보기 ================= */
   if (body.mode === "view") {
-    const got = await callRpc("photo_list", { p_token: token, p_voter: "" });
+    const got = await rpc("photo_list", { p_token: token, p_voter: "" });
     if (!got.ok || !got.data || !Array.isArray(got.data.photos)) {
       return json({ ok: false, code: "expired", message: "다시 입장해주세요" }, 403);
     }
     const photos = got.data.photos as Array<Record<string, unknown>>;
 
-    const signed = await Promise.all(photos.map(async (p) => ({
-      ...p,
-      url: await presign({ method: "GET", accountId: ACCOUNT, bucket: BUCKET,
-                           key: String(p.key), accessKey: AK, secretKey: SK,
-                           expires: VIEW_EXPIRES }),
-      thumbUrl: await presign({ method: "GET", accountId: ACCOUNT, bucket: BUCKET,
-                                key: String(p.thumb), accessKey: AK, secretKey: SK,
-                                expires: VIEW_EXPIRES }),
-    })));
+    if (!photos.length) {
+      return json({ ok: true, photos: [], comments: got.data.comments ?? [],
+                    cap: got.data.cap, used: got.data.used });
+    }
 
-    return json({ ok: true, photos: signed,
-                  comments: got.data.comments ?? [],
-                  cap: got.data.cap, used: got.data.used,
-                  expiresIn: VIEW_EXPIRES });
+    /* 여러 장의 주소를 한 번에 받습니다 */
+    const paths = photos.flatMap((p) => [String(p.key), String(p.thumb)]);
+    const signed = await storage(`object/sign/${BUCKET}`,
+                                 { expiresIn: VIEW_EXPIRES, paths });
+    const map = new Map<string, string>();
+    if (signed.ok && Array.isArray(signed.data)) {
+      for (const row of signed.data) {
+        if (row && row.path && row.signedURL) {
+          map.set(String(row.path), `${URL_}/storage/v1${row.signedURL}`);
+        }
+      }
+    }
+
+    return json({
+      ok: true,
+      photos: photos.map((p) => ({
+        ...p,
+        url: map.get(String(p.key)) ?? "",
+        thumbUrl: map.get(String(p.thumb)) ?? "",
+      })),
+      comments: got.data.comments ?? [],
+      cap: got.data.cap, used: got.data.used,
+      expiresIn: VIEW_EXPIRES,
+    });
   }
 
   /* ================= 올리기 ================= */
@@ -170,31 +129,29 @@ Deno.serve(async (req) => {
     return json({ ok: false, code: "bad", message: "사진 용량이 올바르지 않아요" }, 400);
   }
 
-  /* ---- 방 토큰 확인 + 상한 (판단은 DB 가 합니다) ---- */
-  let slot: { ok?: boolean; key?: string; code?: string; message?: string; left?: number };
-  try {
-    const r = await callRpc("photo_allow", { p_token: token });
-    slot = r.data;
-    if (!r.ok || !slot || slot.ok !== true || !slot.key) {
-      return json({ ok: false, code: slot?.code || "denied",
-                    message: slot?.message || "사진을 올릴 수 없어요" }, 403);
-    }
-  } catch {
-    return json({ ok: false, code: "denied" }, 403);
+  const slot = await rpc("photo_allow", { p_token: token });
+  const s = slot.data as { ok?: boolean; key?: string; code?: string; message?: string; left?: number };
+  if (!slot.ok || !s || s.ok !== true || !s.key) {
+    return json({ ok: false, code: s?.code || "denied",
+                  message: s?.message || "사진을 올릴 수 없어요" }, 403);
   }
 
-  const fullKey = `${slot.key}.webp`;
-  const thumbKey = `${slot.key}-t.webp`;
+  const fullKey = `${s.key}.webp`;
+  const thumbKey = `${s.key}-t.webp`;
 
-  try {
-    const [fullUrl, thumbUrl] = await Promise.all([
-      presign({ method: "PUT", accountId: ACCOUNT, bucket: BUCKET, key: fullKey,
-                accessKey: AK, secretKey: SK, expires: EXPIRES }),
-      presign({ method: "PUT", accountId: ACCOUNT, bucket: BUCKET, key: thumbKey,
-                accessKey: AK, secretKey: SK, expires: EXPIRES }),
-    ]);
-    return json({ ok: true, fullKey, thumbKey, fullUrl, thumbUrl, left: slot.left });
-  } catch {
-    return json({ ok: false, code: "sign", message: "올릴 자리를 만들지 못했어요" }, 500);
+  const [a, b] = await Promise.all([
+    storage(`object/upload/sign/${BUCKET}/${fullKey}`, {}),
+    storage(`object/upload/sign/${BUCKET}/${thumbKey}`, {}),
+  ]);
+  if (!a.ok || !b.ok || !a.data?.url || !b.data?.url) {
+    return json({ ok: false, code: "sign",
+                  message: "사진 올릴 자리를 만들지 못했어요" }, 500);
   }
+
+  return json({
+    ok: true, fullKey, thumbKey,
+    fullUrl: `${URL_}/storage/v1${a.data.url}`,
+    thumbUrl: `${URL_}/storage/v1${b.data.url}`,
+    left: s.left,
+  });
 });

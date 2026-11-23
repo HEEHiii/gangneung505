@@ -263,95 +263,73 @@ Supabase 왼쪽 메뉴 **Edge Functions** → **Deploy a new function** →
 
 ---
 
-## 선택 — 사진 갤러리 (Cloudflare R2)
+## 선택 — 사진 갤러리
 
 여행 사진을 모아두는 기능입니다. **안 해도 됩니다** — 안 하면 사진 탭이
 "이 브라우저에만 저장" 모드로 돌아갑니다 (혼자 눌러볼 수는 있지만
 친구들에게는 안 보이고 30장까지).
 
-> **왜 Supabase 말고 Cloudflare 인가**
->
-> 사진은 이 서비스에서 **유일하게 진짜 돈이 드는 부분**입니다.
-> 휴대폰 사진 한 장이 3~5MB 이고 Supabase 무료 저장소는 1GB 라,
-> 서비스 전체에서 200~300장이면 끝납니다. 더 큰 문제는 보는 쪽이에요 —
-> 월 5GB 전송 제한에서 친구 10명이 사진 30장짜리 방을 한 번 보면
-> 75MB, 즉 **월 65번 보면 소진**됩니다.
->
-> Cloudflare R2 는 **10GB 무료**에 **보는 것이 무료**라 사진에는
-> 사실상 정답입니다.
+**Supabase 안에서 끝납니다.** 다른 계정도, 신용카드도, 따로 넣을 열쇠도
+필요 없습니다.
 
-### 1) 표 만들기
+### 1) 표와 사진함 만들기
 
-[`0008_photos.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0008_photos.sql)
-을 SQL Editor 에 붙여넣고 Run.
+SQL Editor 에 **순서대로** 붙여넣고 Run:
 
-### 2) Cloudflare 준비 (약 15분)
+1. [`0008_photos.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0008_photos.sql) — 사진 목록 표
+2. [`0009_photo_bucket.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0009_photo_bucket.sql) — 사진함 (비공개로)
 
-1. [cloudflare.com](https://dash.cloudflare.com) 가입
-2. 왼쪽 **R2** → **Create bucket**
-   - 이름: 아무거나 (예: `trip-photos`)
-   - **Location: Asia-Pacific** 권장
-3. **공개 설정은 하지 마세요.** 버킷은 비공개로 둡니다.
-
-   > ⚠️ 공개로 열면 사진 주소를 아는 사람은 **비밀번호 없이도** 볼 수
-   > 있고, 한 번 복사해 간 주소는 **비밀번호를 바꿔도 계속 살아**
-   > 있습니다. 비공개로 두면 방에 들어온 사람에게만 **한 시간짜리
-   > 주소**가 발급되고, 그 뒤엔 죽습니다.
-   >
-   > 사진 자체는 여전히 R2 에서 브라우저로 바로 오므로 느려지지
-   > 않습니다. 중계하지 않습니다.
-
-4. R2 첫 화면 → **Manage API tokens** → **Create API token**
-   - 권한: **Object Read & Write**, 그 버킷만
-   - 나오는 **Access Key ID** 와 **Secret Access Key** 를 복사
-     (Secret 은 **한 번만** 보여줍니다)
-5. **Account ID** 도 복사 (R2 화면 오른쪽에 있습니다)
-
-### 3) Supabase 에 열쇠 넣기
-
-**Edge Functions → Secrets** 에서 네 개를 추가합니다:
-
-| 이름 | 값 |
-|---|---|
-| `R2_ACCOUNT_ID` | Cloudflare Account ID |
-| `R2_BUCKET` | 버킷 이름 |
-| `R2_ACCESS_KEY_ID` | Access Key ID |
-| `R2_SECRET_KEY` | Secret Access Key |
-
-> ⚠️ 이 네 개는 **진짜 비밀**입니다. `config.js` 에 넣으면 안 됩니다.
-> 브라우저로 내려가면 누구나 우리 저장소에 아무거나 올릴 수 있습니다.
-
-### 4) 함수 올리기
+### 2) 함수 올리기
 
 **Edge Functions → Deploy a new function → Via Editor**
 
 - 예제 코드를 **전부 지우고**
   [`photo-upload-url/index.ts`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/functions/photo-upload-url/index.ts)
   붙여넣기 (한 파일입니다)
-- **Deploy** 후 **Settings → Verify JWT 끄기**
+- **Deploy** → **Settings → Verify JWT 끄기**
 - 주소창의 `/functions/<이름>/details` 에서 **진짜 이름** 확인
 
-### 5) config.js 채우기
+> 열쇠를 넣을 필요가 없습니다. Supabase 가 자기 함수에게는 필요한
+> 자격을 자동으로 줍니다.
+
+### 3) config.js 한 줄
 
 ```js
-export const PHOTO_FN = "photo-upload-url";   // 4번에서 확인한 진짜 이름
+export const PHOTO_FN = "photo-upload-url";   // 2번에서 확인한 진짜 이름
 ```
 
 공개 주소를 적는 칸은 **없습니다** — 일부러입니다. 주소를 적어두면
-그게 곧 비밀번호 밖의 통로가 되니까요. 연결됐는지는 사진 탭을 열 때
-함수에 물어봐서 압니다.
+그게 곧 비밀번호 밖의 통로가 되니까요.
+
+### 왜 사진함을 공개로 열면 안 되나요
+
+Storage 화면에서 버킷을 공개(public)로 바꿀 수 있는데, **절대 하지
+마세요.**
+
+공개로 열면 사진 주소를 아는 사람은 **비밀번호 없이도** 볼 수 있고,
+한 번 복사해 간 주소는 **비밀번호를 바꿔도 계속 살아** 있습니다.
+다른 탭은 전부 비밀번호 뒤에 있는데 사진만 밖으로 나가는 거예요.
+
+비공개로 두면 방에 들어온 사람에게만 **한 시간짜리 주소**가 발급되고
+그 뒤엔 죽습니다. 사진 자체는 저장소에서 브라우저로 바로 오므로
+느려지지 않습니다.
+
+> 실수로 공개로 바꾸셨으면 `0009_photo_bucket.sql` 을 다시 Run 하세요.
+> 비공개로 되돌아갑니다.
 
 ### 올리기 전에 알아두실 것
 
-사진은 **올릴 때 자동으로 줄입니다** — 긴 변 1600px, 목록용은 400px.
-그러면 전송량이 20분의 1이 되고, 더 중요하게는 **사진에 박힌 촬영
-위치(GPS)가 지워집니다.**
+사진은 **올릴 때 자동으로 줄입니다** — 긴 변 2048px, 목록용은 400px.
+
+- 전송량이 크게 줄어듭니다 (한 장 300~500KB)
+- **사진에 박힌 촬영 위치(GPS)가 지워집니다**
+- A4 인화까지 여유 있는 크기입니다 (카톡은 1280px, 인스타는 1080px로
+  깎으니 그보다 좋습니다)
+- **원본은 찍은 사람 폰에 그대로 있습니다** — 여기는 같이 보는 사본입니다
 
 > 휴대폰 사진에는 찍은 자리의 좌표가 들어 있습니다. 숙소에서 찍은
-> 사진을 그대로 올리면 **숙소 위치가 좌표까지 공개**됩니다. 링크를
-> 가진 누구나 볼 수 있는 방인데요. 줄이는 과정에서 그게 사라집니다.
->
-> 좌표를 박은 사진으로 실제 확인한 검사가
+> 사진을 그대로 올리면 **숙소 위치가 좌표까지 공개**됩니다. 줄이는
+> 과정에서 그게 사라집니다. 좌표를 박은 사진으로 실제 확인한 검사가
 > `tests/photo.spec.mjs` 에 있습니다.
 
 **여행이 끝난 뒤에 올리는 걸 권합니다.** 여행 중에 올리면 "지금 어디에
@@ -360,10 +338,10 @@ export const PHOTO_FN = "photo-upload-url";   // 4번에서 확인한 진짜 이
 
 사진을 **폰에 저장하는 건 그대로 됩니다.** 크게 보기에서 "사진 저장"
 버튼을 누르면 돼요. 안 되는 건 "사진 **주소**를 복사해 방 밖으로
-보내는 것"뿐이고, 그게 막으려던 겁니다. 밖으로 보내려면 저장해서
-파일로 보내면 됩니다.
+보내는 것"뿐이고, 그게 막으려던 겁니다.
 
-한 방에 **300장**까지입니다.
+한 방에 **300장**까지, 무료 저장소로 **전체 2,000장쯤** 됩니다.
+사람이 많아져 모자라면 그때 Cloudflare R2 로 옮기면 됩니다.
 
 ---
 

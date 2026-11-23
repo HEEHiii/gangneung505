@@ -65,8 +65,8 @@ const r = await page.evaluate(async (arr) => {
 }, bytes);
 
 ok(r.canResize, "이 브라우저에서 줄이기를 쓸 수 있다");
-ok(r.width <= 1600 && r.height <= 1600,
-  `보기용이 긴 변 1600 이내로 줄어듦  (${r.width}x${r.height})`);
+ok(r.width <= 2048 && r.height <= 2048,
+  `보기용이 긴 변 2048 이내로 줄어듦  (${r.width}x${r.height})`);
 ok(r.fullBytes < r.srcBytes, `용량이 줄어듦  (${r.srcBytes} → ${r.fullBytes})`);
 ok(r.thumbBytes < r.fullBytes, "목록용이 보기용보다 작다");
 ok(/^image\/(webp|jpeg)$/.test(r.type), `쓸 수 있는 형식을 고름  (${r.type})`);

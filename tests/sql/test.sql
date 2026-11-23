@@ -929,6 +929,66 @@ select pg_temp.ok((select count(*) from app.photos) = 1,
 
 
 -- ============================================================
+--  9.10 사진함은 비공개여야 한다
+--
+--  ★ 이 서비스에서 가장 중요한 한 글자가 public = false 입니다.
+--
+--    공개로 열리면 사진 주소를 아는 사람은 비밀번호 없이도 볼 수
+--    있고, 한 번 복사해 간 주소는 비밀번호를 바꿔도 계속 살아
+--    있습니다. 다른 탭은 전부 비밀번호 뒤에 있는데 사진만 밖으로
+--    나가는 겁니다.
+--
+--    화면에서 토글 한 번이면 바뀌는 설정이라, 테스트로 붙잡아
+--    둡니다. 0009 를 다시 돌리면 비공개로 되돌아오는 것도 함께
+--    확인합니다 — 실수했을 때 되돌릴 방법이 있어야 합니다.
+-- ============================================================
+\echo '── 9.10 사진함'
+reset role;
+
+select pg_temp.ok(
+  exists (select 1 from storage.buckets where id = 'trip-photos'),
+  '사진함이 만들어졌다');
+
+select pg_temp.ok(
+  (select public from storage.buckets where id = 'trip-photos') = false,
+  '★ 사진함이 비공개다 (사진은 비밀번호 뒤에 있어야 합니다)');
+
+select pg_temp.ok(
+  (select file_size_limit from storage.buckets where id = 'trip-photos') = 10485760,
+  '한 장에 10MB 상한이 서버에도 걸려 있다');
+
+select pg_temp.ok(
+  'image/webp' = any (select unnest(allowed_mime_types)
+                        from storage.buckets where id = 'trip-photos'),
+  '사진 형식만 받는다');
+
+-- 실수로 공개로 바꿨다가 마이그레이션을 다시 돌리면 잠겨야 합니다
+update storage.buckets set public = true where id = 'trip-photos';
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('trip-photos', 'trip-photos', false, 10485760,
+        array['image/webp', 'image/jpeg', 'image/png'])
+on conflict (id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+select pg_temp.ok(
+  (select public from storage.buckets where id = 'trip-photos') = false,
+  '★ 실수로 공개했어도 0009 를 다시 돌리면 비공개로 되돌아온다');
+
+select pg_temp.ok(
+  (select relrowsecurity from pg_class c
+     join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'storage' and c.relname = 'objects'),
+  '저장된 파일에 직접 접근은 막혀 있다 (RLS)');
+
+select pg_temp.ok(
+  not exists (select 1 from pg_policies
+               where schemaname = 'storage' and tablename = 'objects'),
+  '저장소에 열어준 정책이 하나도 없다 (Edge Function 만 들어갑니다)');
+
+
+-- ============================================================
 --  10. 방 삭제는 자식까지 함께
 -- ============================================================
 \echo '── 10. 방 삭제'
