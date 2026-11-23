@@ -319,6 +319,15 @@ const TAB_LABEL = {
   stay: "숙소", food: "맛집", plan: "일정", money: "정산", photo: "사진",
 };
 
+/* "42초" / "3분 10초" — 평균이라 초를 버리면 짧은 탭끼리 구별이 안 됩니다 */
+function howLong(sec) {
+  const n = Math.round(sec);
+  if (!(n > 0)) return "";
+  if (n < 60) return `${n}초`;
+  const m = Math.floor(n / 60), r = n % 60;
+  return r ? `${m}분 ${r}초` : `${m}분`;
+}
+
 async function showUsage() {
   const box = $("#usage"), list = $("#usage-list"), note = $("#usage-note");
 
@@ -340,16 +349,21 @@ async function showUsage() {
   list.innerHTML = rows.map((r) => {
     const n = Number(r.views) || 0;
     const pct = Math.round((n / top) * 100);
+    const visits = Number(r.visits) || 0;
+    const secs = Number(r.seconds) || 0;
+    /* ★ 합계가 아니라 평균을 보여줍니다. 합계는 사람이 많은 탭이
+       무조건 이겨서, "이 탭에서 뭘 하다 가는가" 를 못 봅니다. */
+    const avg = visits ? howLong(secs / visits) : "";
     return `
       <li>
         <span class="usage-name">${esc(TAB_LABEL[r.tab] || r.tab)}</span>
         <span class="usage-bar"><span style="width:${pct}%"></span></span>
-        <span class="usage-num">${n}</span>
+        <span class="usage-num">${n}${avg ? ` · ${esc(avg)}` : ""}</span>
       </li>`;
   }).join("");
 
   note.textContent =
-    `한 사람이 하루에 한 탭을 열면 1 로 셉니다` +
+    `왼쪽 숫자는 본 사람(하루 한 번), 오른쪽은 한 번 들어와서 머문 평균 시간이에요` +
     (since ? ` (${esc(since)} 부터, 모두 ${sum})` : ` (모두 ${sum})`) +
     `. 방이나 사람은 기록하지 않아요.`;
 }

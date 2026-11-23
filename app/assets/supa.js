@@ -51,6 +51,7 @@ export const RPC = {
   photo_remove: ["p_token", "p_voter", "p_id"],
   // 어느 탭을 쓰는지 세기. 방도 사람도 기록하지 않습니다 (0010 주석 참고)
   tab_seen:     ["p_token", "p_tab"],
+  tab_time:     ["p_token", "p_tab", "p_seconds"],
 
   /* ---- 로그인한 방장만 ---- */
   room_create: [

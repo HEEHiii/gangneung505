@@ -841,6 +841,36 @@ export function createStore(slug) {
       catch (_) {}
     },
 
+    /* ---------- 탭에 얼마나 머물렀는지 ----------
+
+       beacon=true 는 "페이지가 지금 닫히는 중" 이라는 뜻입니다.
+       그때는 보통 요청이 중간에 끊기므로 sendBeacon 으로 보냅니다.
+       브라우저가 페이지를 닫은 뒤에도 알아서 끝까지 보내줍니다.
+
+       sendBeacon 은 헤더를 못 붙여서 apikey 를 주소에 싣습니다.
+       공개되어도 되는 키라 문제가 없습니다(config.js 주석 참고).
+
+       ★ 여기서도 실패는 아무 말 없이 넘어갑니다. 통계 때문에
+         사용자에게 경고를 띄울 이유가 없습니다. */
+    tabTime(tab, seconds, beacon = false) {
+      if (!online) return;
+      // need() 는 토큰이 없으면 던집니다. 통계 때문에 화면이 멈추면
+      // 안 되므로, 여기서는 던지지 않고 그냥 그만둡니다.
+      if (!token || !(seconds >= 2)) return;
+      const body = { p_token: token, p_tab: tab, p_seconds: Math.round(seconds) };
+
+      if (beacon && typeof navigator !== "undefined" && navigator.sendBeacon) {
+        try {
+          const url = `${SUPABASE_URL}/rest/v1/rpc/tab_time`
+                    + `?apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`;
+          navigator.sendBeacon(url,
+            new Blob([JSON.stringify(body)], { type: "application/json" }));
+          return;
+        } catch (_) { /* 아래 평소 경로로 */ }
+      }
+      rpc("tab_time", body).catch(() => {});
+    },
+
     /* ---------- 아직 쓰는 방이라고 표시 ---------- */
     async touch() {
       if (!online) return { ok: true };

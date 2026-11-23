@@ -267,6 +267,39 @@ function redrawAll() {
    ============================================================ */
 const TABS = ["stay", "food", "plan", "money", "photo"];
 
+/* ------------------------------------------------------------
+   탭에 얼마나 머물렀나
+
+   ★ 화면이 가려진 동안은 세지 않습니다. 안 그러면 창을 켜 둔 채
+     자리를 비운 사람이 "숙소 탭 3시간"을 만들고, 그 한 번이 평균을
+     통째로 망칩니다. 서버에서도 30분에서 한 번 더 자릅니다.
+
+   ★ 창을 닫을 때는 보통 요청이 중간에 끊기므로 sendBeacon 으로
+     보냅니다 (store.js 의 tabTime 주석 참고).
+   ------------------------------------------------------------ */
+let dwellTab = null;
+let dwellAt  = 0;
+
+function dwellFlush(closing = false) {
+  if (!dwellTab || !dwellAt || !store || !store.tabTime) return;
+  const secs = (Date.now() - dwellAt) / 1000;
+  dwellAt = Date.now();            // 이어서 다시 셉니다
+  store.tabTime(dwellTab, secs, closing);
+}
+
+function dwellStart(tab) {
+  dwellFlush();                    // 떠나는 탭의 시간을 먼저 적고
+  dwellTab = tab;
+  dwellAt  = document.visibilityState === "hidden" ? 0 : Date.now();
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") { dwellFlush(); dwellAt = 0; }
+  else dwellAt = Date.now();
+});
+window.addEventListener("pagehide", () => dwellFlush(true));
+
+
 function showTab(name) {
   const tab = TABS.includes(name) ? name : "stay";
   TABS.forEach((t) => { $(`#panel-${t}`).hidden = t !== tab; });
@@ -281,6 +314,7 @@ function showTab(name) {
 
   // 어느 탭이 실제로 쓰이는지 (하루 한 번, 실패해도 조용히)
   if (store && store.tabSeen) store.tabSeen(tab);
+  dwellStart(tab);
 }
 
 

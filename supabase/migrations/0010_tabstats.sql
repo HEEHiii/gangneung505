@@ -81,6 +81,10 @@ $$;
 --  숫자 자체는 비밀이 아니지만, 서비스 상태를 아무나 들여다볼
 --  이유도 없어서 로그인 뒤에 둡니다.
 -- ------------------------------------------------------------
+-- 0011 이 돌려주는 칸을 늘립니다. 이 파일을 다시 Run 해도 부딪히지
+-- 않도록 먼저 지웁니다 (Postgres 는 반환 모양이 달라지면 거부합니다).
+drop function if exists public.tab_report(integer);
+
 create or replace function public.tab_report(p_days integer default 30)
 returns table (tab text, views bigint, first_day date)
 language plpgsql

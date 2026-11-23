@@ -1059,7 +1059,7 @@ select pg_temp.ok(
      join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'app' and c.relname = 'tab_views'
       and a.attnum > 0 and not a.attisdropped)
-    = array['tab', 'the_date', 'views'],
+    = array['seconds', 'tab', 'the_date', 'views', 'visits'],
   '★ 탭 표에는 날짜·탭·숫자뿐이다 (사람도 방도 없다)');
 
 set role anon;
@@ -1109,12 +1109,81 @@ begin
   perform pg_temp.ok(v_blocked, '로그인 없이는 통계를 못 본다');
 end $$;
 
+-- ★ 로그인만으로는 안 됩니다. 명단(app.admins)에 있어야 합니다.
+delete from app.admins;
+do $$
+declare v_blocked boolean := false;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    '{"sub":"11111111-1111-1111-1111-111111111111"}', true);
+  begin
+    perform * from public.tab_report(30);
+  exception when others then v_blocked := true;
+  end;
+  reset role;
+  perform pg_temp.ok(v_blocked, '★ 로그인해도 명단에 없으면 못 본다');
+end $$;
+
+insert into app.admins (user_id, note)
+  values ('11111111-1111-1111-1111-111111111111', '테스트');
+
 set role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"11111111-1111-1111-1111-111111111111"}', false);
 select pg_temp.ok(
   (select views from public.tab_report(30) where tab = 'money') = 2,
-  '로그인하면 숫자가 보인다');
+  '명단에 있으면 숫자가 보인다');
+reset role;
+
+
+-- ============================================================
+--  9.13 탭에 머문 시간
+-- ============================================================
+\echo '── 9.13 머문 시간'
+set role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', false);
+
+select public.tab_time((select v::jsonb ->> 'token' from t where k = 'tok1b'), 'money', 30);
+select public.tab_time((select v::jsonb ->> 'token' from t where k = 'tok1b'), 'money', 90);
+-- 스쳐 지나간 것은 안 셉니다
+select public.tab_time((select v::jsonb ->> 'token' from t where k = 'tok1b'), 'money', 1);
+-- 창을 켜 둔 채 자리를 비운 것은 30분에서 자릅니다
+select public.tab_time((select v::jsonb ->> 'token' from t where k = 'tok1b'), 'plan', 99999);
+
+reset role;
+select pg_temp.ok(
+  (select visits from app.tab_views where tab = 'money' and the_date = current_date) = 2,
+  '들어온 횟수를 센다 (너무 짧은 건 빼고)');
+select pg_temp.ok(
+  (select seconds from app.tab_views where tab = 'money' and the_date = current_date) = 120,
+  '머문 시간을 더한다');
+select pg_temp.ok(
+  (select seconds from app.tab_views where tab = 'plan' and the_date = current_date) = 1800,
+  '★ 자리를 비운 시간은 30분에서 자른다');
+select pg_temp.ok(
+  (select views from app.tab_views where tab = 'plan' and the_date = current_date) = 0,
+  '머문 시간만으로는 "본 사람"이 늘지 않는다');
+
+-- 가짜 토큰으로는 시간도 못 넣습니다
+do $$
+declare v_blocked boolean := false;
+begin
+  set local role anon;
+  begin
+    perform public.tab_time('아무거나-가짜-토큰', 'money', 60);
+  exception when others then v_blocked := true;
+  end;
+  reset role;
+  perform pg_temp.ok(v_blocked, '가짜 토큰으로는 시간을 못 넣는다');
+end $$;
+
+set role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111"}', false);
+select pg_temp.ok(
+  (select seconds from public.tab_report(30) where tab = 'money') = 120,
+  '통계에 머문 시간이 함께 나온다');
 reset role;
 
 

@@ -1167,5 +1167,6 @@ body{
 .usage-list .usage-num {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
-  font-size: .9rem;
+  font-size: .85rem;
+  white-space: nowrap;
 }
