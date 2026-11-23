@@ -124,9 +124,36 @@ export const PHOTO_FN = "photo-upload-url-index-ts";
    아래는 건드리지 않아도 됩니다
    ============================================================ */
 
+/* ------------------------------------------------------------
+   시험용 — 주소에 ?login=kakao 를 붙인 그 한 번만 다른 수단으로
+
+   왜 필요한가: 새 로그인(예: 카카오 비즈 앱 심사 통과)이 진짜로
+   되는지는 실제로 해보기 전까지 알 수 없습니다. 그렇다고 위
+   LOGIN_PROVIDER 를 바꿔서 확인하면, 안 될 경우 그동안 아무도
+   방을 못 만듭니다. 그래서 기본값은 건드리지 않고 주소로만
+   시험합니다.
+
+   돌아오는 주소에는 이 값이 안 실립니다(auth.js 가 pathname 으로
+   다시 만듭니다). 한 번 들어오면 세션이 남으므로 그걸로 충분합니다.
+
+   아는 이름만 받습니다 — 오타가 Supabase 까지 가서 엉뚱한 오류로
+   나타나지 않도록.
+   ------------------------------------------------------------ */
+const LOGIN_CHOICES = ["google", "github", "kakao"];
+
+export function loginProvider() {
+  try {
+    const want = new URLSearchParams(location.search).get("login");
+    if (want && LOGIN_CHOICES.includes(want)) return want;
+  } catch (_) { /* location 이 없는 곳(테스트 등)에서는 기본값 */ }
+  return LOGIN_PROVIDER;
+}
+
 /* 로그인 버튼에 쓸 이름 — 설정과 화면 문구가 어긋나지 않게 한 곳에서 만듭니다 */
-export const loginName = () =>
-  ({ kakao: "카카오", google: "구글", github: "깃허브" }[LOGIN_PROVIDER] || LOGIN_PROVIDER);
+export const loginName = () => {
+  const p = loginProvider();
+  return { kakao: "카카오", google: "구글", github: "깃허브" }[p] || p;
+};
 
 /* 서버에 저장하며 친구와 합칠 수 있는 상태인가 */
 export const hasBackend = () => !!(SUPABASE_URL && SUPABASE_ANON_KEY);

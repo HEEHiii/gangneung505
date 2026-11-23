@@ -18,7 +18,7 @@
    ============================================================ */
 
 import { getClient } from "./supa.js";
-import { hasBackend, LOGIN_PROVIDER, loginName } from "./config.js";
+import { hasBackend, loginProvider, loginName } from "./config.js";
 import { newId } from "./session.js";
 
 /* ============================================================
@@ -160,13 +160,13 @@ export async function signIn(form) {
 
   try {
     const { error } = await c.auth.signInWithOAuth({
-      provider: LOGIN_PROVIDER,
+      provider: loginProvider(),
       options: { redirectTo: back.toString() },
     });
     if (error) throw error;
     return { state: "sent" };
   } catch (e) {
-    console.warn(`[로그인] ${LOGIN_PROVIDER} 로 보내지 못했습니다`, e);
+    console.warn(`[로그인] ${loginProvider()} 로 보내지 못했습니다`, e);
     return {
       state: "error",
       message: `${loginName()} 로그인을 시작할 수 없어요. 잠시 뒤에 다시 시도해주세요.`,

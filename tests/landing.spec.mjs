@@ -13,7 +13,7 @@ const { chromium } = createRequire(import.meta.url)("playwright");
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { stubConfig } from "./stub-config.mjs";
+import { FAKE_SUPABASE, stubConfig } from "./stub-config.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.BASE || "http://localhost:8080";
@@ -427,6 +427,37 @@ console.log("── 테마 고르기 탭 영역");
     `통계 때문에 콘솔 오류가 나지 않는다${errors.length ? " — " + errors[0] : ""}`);
 
   await ctx.close();
+}
+
+/* ============================================================
+   시험용 로그인 수단 바꾸기 (?login=)
+
+   ★ 비즈 앱 심사가 통과했는지는 실제로 로그인해봐야 압니다.
+     그렇다고 config.js 를 바꿔서 확인하면 안 될 때 아무도 방을
+     못 만듭니다. 주소로만 바뀌고 기본값은 그대로여야 합니다.
+   ============================================================ */
+{
+  console.log("── 시험용 로그인 수단");
+
+  const noteFor = async (query) => {
+    const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
+    await stubConfig(ctx, FAKE_SUPABASE);
+    const page = await ctx.newPage();
+    await page.goto(`${BASE}/app/index.html${query}`);
+    await page.waitForFunction(() => window.__landingReady === true, { timeout: 10000 });
+    const t = await page.locator("#login-note").innerText();
+    await ctx.close();
+    return t;
+  };
+
+  const base = await noteFor("");
+  ok(/깃허브/.test(base), `기본값은 config.js 그대로  (${base.slice(0, 20)}…)`);
+
+  const kakao = await noteFor("?login=kakao");
+  ok(/카카오/.test(kakao), `★ ?login=kakao 면 카카오로 바뀐다  (${kakao.slice(0, 20)}…)`);
+
+  const bogus = await noteFor("?login=페이스북");
+  ok(/깃허브/.test(bogus), `모르는 이름은 무시하고 기본값으로  (${bogus.slice(0, 20)}…)`);
 }
 
 await browser.close();
