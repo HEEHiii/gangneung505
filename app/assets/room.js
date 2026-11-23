@@ -942,7 +942,22 @@ function openPhoto(id) {
   $("#photo-save").hidden = !p.url;
 
   renderPhotoComments();
-  $("#photo-view").showModal();
+
+  const dlg = $("#photo-view");
+  dlg.showModal();
+
+  /* ★ 사진부터 보여야 합니다.
+
+     <dialog> 는 열릴 때 "처음 누를 수 있는 요소"로 포커스를 옮기고,
+     브라우저는 그 자리로 스크롤합니다. 우리 상자에서는 그게 댓글
+     입력칸이라, 폰에서 사진을 누르면 사진은 안 보이고 "한마디
+     남기기" 부터 뜹니다.
+
+     상자 자체(tabindex="-1")에 포커스를 두고 맨 위로 올립니다. */
+  const box = $("#photo-view .photo-box");
+  if (box) box.focus({ preventScroll: true });
+  dlg.scrollTop = 0;
+  if (box) box.scrollTop = 0;
 }
 
 function renderPhotoComments() {

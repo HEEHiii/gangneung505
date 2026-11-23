@@ -1039,6 +1039,33 @@ console.log("── 사진 갤러리");
   await page.locator(".photo-cell").first().click();
   await page.waitForTimeout(400);
   eq(await page.locator("#photo-view").isVisible(), true, "누르면 크게 보인다");
+
+  /* ★ 사진이 먼저 보여야 합니다.
+
+     <dialog> 는 열릴 때 "처음 누를 수 있는 요소" 로 포커스를 옮기고
+     브라우저가 그 자리로 스크롤합니다. 우리 상자에서는 그게 댓글
+     입력칸이라, 폰에서 사진을 누르면 사진은 안 보이고 "한마디
+     남기기" 부터 떴습니다. */
+  {
+    const v = await page.evaluate(() => {
+      const dlg = document.querySelector("#photo-view");
+      const img = document.querySelector("#photo-big");
+      const r = img.getBoundingClientRect();
+      return {
+        dlgScroll: dlg.scrollTop,
+        imgTop: Math.round(r.top),
+        imgBottom: Math.round(r.bottom),
+        winH: window.innerHeight,
+        focused: (document.activeElement && document.activeElement.className) || "",
+      };
+    });
+    eq(v.dlgScroll, 0, "★ 상자가 맨 위에서 열린다 (아래로 안 밀림)");
+    ok(v.imgTop >= -2, `사진 윗부분이 잘리지 않는다  (위 ${v.imgTop}px)`);
+    ok(v.imgTop < v.winH * 0.6,
+      `사진이 화면 안에 들어와 있다  (위 ${v.imgTop}px / 화면 ${v.winH}px)`);
+    ok(!/cmt-input/.test(v.focused),
+      `댓글칸으로 바로 뛰지 않는다  (포커스: ${v.focused || "상자"})`);
+  }
   eq(await page.locator("#photo-del").isVisible(), true, "내가 올린 사진은 지울 수 있다");
   eq(await page.locator("#photo-save").isVisible(), true,
     "사진을 폰에 저장할 수 있다 (주소는 못 넘겨도 사진은 받을 수 있어야 합니다)");
@@ -1151,6 +1178,91 @@ console.log("── 사진 — 여행 중 경고");
     eq(await page.locator("#photo-warn.strong").count(), 0, "경고 수위가 낮아진다");
     await ctx.close();
   }
+}
+
+
+/* ============================================================
+   사진은 올린 사람만 지운다
+
+   ★ 브라우저를 따로 쓰면 다른 사람입니다 (저장소가 분리됩니다).
+     남이 올린 사진에는 지우기 버튼이 아예 안 보여야 하고,
+     버튼을 숨기는 것만으로는 부족하므로 서버도 막습니다
+     (tests/sql/test.sql 9.9 에서 확인합니다).
+   ============================================================ */
+console.log("── 사진 — 올린 사람만 지우기");
+{
+  const a = await fresh();
+  await openRoom(a.page, await makeRoom(a.page, { title: "사진 권한" }));
+  await enter(a.page);
+  await a.page.click('#tabs a[data-tab="photo"]');
+  await a.page.waitForSelector("#panel-photo:not([hidden])", { timeout: 5000 });
+  await a.page.setInputFiles("#photo-input", {
+    name: "mine.jpg", mimeType: "image/jpeg", buffer: Buffer.from(gpsJpegBytes()),
+  });
+  await a.page.waitForTimeout(1500);
+
+  await a.page.locator(".photo-cell").first().click();
+  await a.page.waitForTimeout(400);
+  eq(await a.page.locator("#photo-del").isVisible(), true,
+    "내가 올린 사진에는 '사진 지우기' 가 보인다");
+  eq(await a.page.locator("#photo-save").isVisible(), true,
+    "저장 버튼도 함께 보인다");
+
+  await a.page.keyboard.press("Escape");
+  await a.page.waitForTimeout(200);
+
+  /* ★ 남이 올린 사진을 실제로 만들어 봅니다.
+
+     저장된 방에 "다른 사람이 올린" 사진을 한 장 끼워 넣고 다시
+     읽게 합니다. 화면 코드가 mine 을 보고 버튼을 숨기는지,
+     진짜로 확인하는 방법입니다. */
+  const slug = await a.page.evaluate(() => {
+    const u = new URL(location.href);
+    return (u.searchParams.get("r") || "").toUpperCase();
+  });
+  await a.page.evaluate((slug) => {
+    const key = `trip.local.${slug}`;
+    const box = JSON.parse(localStorage.getItem(key));
+    const mine = box.photos[0];
+    box.photos.push({
+      ...mine,
+      id: "ph-someone-else",
+      caption: "친구가 올린 사진",
+      created_by: "다른-사람",          /* 내 voter 와 다릅니다 */
+    });
+    localStorage.setItem(key, JSON.stringify(box));
+  }, slug);
+
+  await a.page.reload();
+  await a.page.waitForFunction(() => window.__roomReady === true, { timeout: 8000 });
+  await a.page.waitForTimeout(400);
+  await a.page.click('#tabs a[data-tab="photo"]');
+  await a.page.waitForTimeout(600);
+  eq(await a.page.locator(".photo-cell").count(), 2, "사진이 두 장 보인다");
+
+  /* 두 번째(친구 것)를 열어봅니다 */
+  await a.page.locator(".photo-cell").nth(1).click();
+  await a.page.waitForTimeout(400);
+  eq(await a.page.locator("#photo-del").isVisible(), false,
+    "★ 남이 올린 사진에는 '사진 지우기' 가 안 보인다");
+  eq(await a.page.locator("#photo-save").isVisible(), true,
+    "그래도 저장은 할 수 있다");
+
+  /* 화면을 속여도 서버가 막습니다 (SQL 테스트 9.9 와 짝입니다) */
+  const blocked = await a.page.evaluate(async () => {
+    const { createStore } = await import("/app/assets/store.js");
+    const { getToken } = await import("/app/assets/session.js");
+    const u = new URL(location.href);
+    const slug = (u.searchParams.get("r") || "").toUpperCase();
+    const s = createStore(slug);
+    s.setToken(getToken(slug));          /* 새로 만든 store 라 직접 넣어줍니다 */
+    try { await s.photoRemove("ph-someone-else"); return "지워짐"; }
+    catch (e) { return e.message; }
+  });
+  ok(/직접 올린/.test(blocked),
+    `★ 버튼을 우회해도 막힌다  (${blocked})`);
+
+  await a.ctx.close();
 }
 
 await browser.close();
