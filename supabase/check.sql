@@ -27,6 +27,15 @@ owner_funcs(name) as (values
   ('room_create'), ('room_list_mine'), ('room_resume'),
   ('room_set_password'), ('room_delete')
 ),
+-- 나중에 더한 기능들 (경비·일정·댓글·링크·사진)
+later_funcs(name, need) as (values
+  ('expense_add',          '0004'), ('expense_remove',    '0004'),
+  ('itinerary_day_save',   '0005'), ('itinerary_build_save','0005'),
+  ('comment_add',          '0006'), ('comment_remove',    '0006'),
+  ('resolve_allow',        '0007'),
+  ('photo_allow',          '0008'), ('photo_add',         '0008'),
+  ('photo_remove',         '0008'), ('photo_list',        '0008')
+),
 expected_funcs(name) as (
   select name from guest_funcs union all select name from owner_funcs
 ),
@@ -123,7 +132,25 @@ checks(sort, 항목, ok, 설명) as (
     coalesce('안 고정됨: ' || (select string_agg(name, ', ' order by name) from loose),
              '전부 고정됨')
 
-  union all select 10, '10. 비밀 소금값 생성됨',
+  union all select 10, '10. 나중에 더한 기능들',
+    not exists (select 1 from later_funcs
+                 where name not in (select name from got_funcs)),
+    coalesce('빠짐: ' || (select string_agg(name || ' (' || need || ')', ', ' order by name)
+                          from later_funcs
+                          where name not in (select name from got_funcs)),
+             '경비·일정·댓글·링크·사진 전부 있음')
+
+  union all select 11, '11. 사진함이 비공개',
+    coalesce((select not public from storage.buckets where id = 'trip-photos'), false),
+    case
+      when not exists (select 1 from storage.buckets where id = 'trip-photos')
+        then '사진함이 없어요 — 0009_photo_bucket.sql 을 돌려주세요'
+      when (select public from storage.buckets where id = 'trip-photos')
+        then '⚠ 공개로 열려 있어요! 0009 를 다시 돌리면 잠깁니다'
+      else '비공개 — 사진도 비밀번호 뒤에 있습니다'
+    end
+
+  union all select 12, '12. 비밀 소금값 생성됨',
     exists (select 1 from app.config where id = 1 and length(pepper) >= 32),
     '입장 시도 횟수를 셀 때 씁니다'
 )

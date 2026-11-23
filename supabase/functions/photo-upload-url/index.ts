@@ -86,7 +86,26 @@ Deno.serve(async (req) => {
   /* ================= 보기 ================= */
   if (body.mode === "view") {
     const got = await rpc("photo_list", { p_token: token, p_voter: "" });
-    if (!got.ok || !got.data || !Array.isArray(got.data.photos)) {
+
+    /* ★ 왜 실패했는지 구분해서 말합니다.
+
+       전에는 전부 "다시 입장해주세요" 였습니다. 그런데 실제로는
+       0008 을 안 돌려서 함수가 없는 경우가 많고, 그때 "다시
+       입장하라"는 말을 들으면 엉뚱한 데를 고치게 됩니다. */
+    if (!got.ok) {
+      const msg = String(got.data?.message || "");
+      if (/function.*does not exist|could not find.*function|PGRST202/i.test(msg)) {
+        return json({ ok: false, code: "nosql",
+          message: "사진 표가 아직 없어요 (0008_photos.sql 을 돌려주세요)" }, 424);
+      }
+      if (/expired|입장/.test(msg)) {
+        return json({ ok: false, code: "expired",
+                      message: "다시 입장해주세요" }, 403);
+      }
+      return json({ ok: false, code: "db",
+                    message: msg || "사진 목록을 불러오지 못했어요" }, 424);
+    }
+    if (!got.data || !Array.isArray(got.data.photos)) {
       return json({ ok: false, code: "expired", message: "다시 입장해주세요" }, 403);
     }
     const photos = got.data.photos as Array<Record<string, unknown>>;

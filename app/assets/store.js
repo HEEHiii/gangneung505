@@ -658,6 +658,11 @@ export function createStore(slug) {
                         + `(Edge Functions → ${PHOTO_FN} → Verify JWT 를 꺼주세요)`;
           } else if (res.status === 503) {
             galleryNote = "사진함이 아직 준비되지 않았어요 (0009_photo_bucket.sql 을 돌려주세요)";
+          } else if (res.status === 403 || res.status === 424) {
+            /* 함수가 DB 에 물어본 게 실패한 경우 — 이유를 그대로 전합니다 */
+            const why = await res.json().catch(() => null);
+            galleryNote = (why && why.message)
+              || "사진 표가 아직 없어요 (0008_photos.sql 과 0009_photo_bucket.sql 을 돌려주세요)";
           } else {
             galleryNote = `사진 보관함에 연결하지 못했어요 (${res.status})`;
           }
