@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>연결 점검 — 여행방</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  body{padding:20px var(--gutter) 60px;max-width:720px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 6px}
+  .row{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0;
+       background:var(--surface)}
+  .row h2{font-size:14px;margin:0 0 6px;display:flex;gap:8px;align-items:center}
+  .tag{font-size:12px;padding:1px 7px;border-radius:99px;font-weight:600}
+  .ok{background:var(--accent-soft);color:var(--accent)}
+  .bad{background:var(--accent-soft);color:var(--danger)}
+  pre{margin:6px 0 0;font-size:12px;line-height:1.5;white-space:pre-wrap;
+      word-break:break-all;color:var(--muted)}
+  .hint{font-size:13px;color:var(--text);margin-top:6px}
+</style>
+</head><body>
+
+<h1>연결 점검</h1>
+<p class="field-note">
+  사진·링크 기능이 왜 안 되는지 알아봅니다. 아무것도 바꾸지 않고 물어보기만 합니다.
+</p>
+<p class="field-note" id="howto">
+  방에 한 번 들어갔던 브라우저에서 열어주세요.
+  주소 끝에 <code>?r=방주소</code> 를 붙여도 됩니다.
+</p>
+
+<div id="out"></div>
+
+<script type="module">
+import { SUPABASE_URL, SUPABASE_ANON_KEY, PHOTO_FN, RESOLVE_FN } from "./assets/config.js";
+
+const out = document.getElementById("out");
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function row(title, ok, body, hint) {
+  const d = document.createElement("div");
+  d.className = "row";
+  d.innerHTML =
+    `<h2>${esc(title)} <span class="tag ${ok ? "ok" : "bad"}">${ok ? "정상" : "문제"}</span></h2>` +
+    `<pre>${esc(body)}</pre>` +
+    (hint ? `<p class="hint">${hint}</p>` : "");
+  out.appendChild(d);
+  return ok;
+}
+
+/* 방 주소 찾기 — 주소창에 있으면 그걸, 없으면 저장된 것 중 아무거나 */
+function findSlug() {
+  const q = new URL(location.href).searchParams.get("r");
+  if (q) return q.toUpperCase();
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    const m = k && k.match(/^trip\.([23456789BCDFGHJKMNPQRSTVWXZ]{9})\.tok$/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+const slug = findSlug();
+const token = slug ? localStorage.getItem(`trip.${slug}.tok`) : null;
+
+row("설정", !!(SUPABASE_URL && SUPABASE_ANON_KEY),
+  `주소     ${SUPABASE_URL || "(비어 있음)"}\n` +
+  `열쇠     ${SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY.slice(0, 22) + "…" : "(비어 있음)"}\n` +
+  `사진함수 ${PHOTO_FN}\n링크함수 ${RESOLVE_FN}`);
+
+row("방 입장 정보", !!token,
+  slug ? `방 주소  ${slug}\n토큰     ${token ? token.slice(0, 12) + "… (" + token.length + "자)" : "없음"}`
+       : "이 브라우저에 입장한 방이 없습니다",
+  token ? "" : "먼저 방에 들어갔다 와서 이 페이지를 다시 열어주세요.");
+
+/* 서버가 살아 있는가 */
+try {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/health`, {
+    method: "POST",
+    headers: { "content-type": "application/json",
+               apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    body: "{}",
+  });
+  row("서버 (Supabase)", r.ok, `HTTP ${r.status}\n${(await r.text()).slice(0, 200)}`);
+} catch (e) {
+  row("서버 (Supabase)", false, String(e));
+}
+
+/* 사진 목록 기능이 되는가 — 화면을 거치지 않고 직접 */
+if (token) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/photo_list`, {
+      method: "POST",
+      headers: { "content-type": "application/json",
+                 apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ p_token: token, p_voter: "" }),
+    });
+    const text = await r.text();
+    row("사진 목록 (DB)", r.ok, `HTTP ${r.status}\n${text.slice(0, 400)}`,
+      r.ok ? "" :
+      /read-only|읽기 전용/i.test(text)
+        ? "0008_photos.sql 을 <b>다시 Run</b> 해주세요 (photo_list 가 옛 정의입니다)"
+        : /PGRST202|does not exist/i.test(text)
+          ? "0008_photos.sql 을 Run 해주세요 (기능이 아직 없습니다)"
+          : "위 내용을 그대로 알려주세요");
+  } catch (e) {
+    row("사진 목록 (DB)", false, String(e));
+  }
+
+  /* Edge Function 까지 가는가 */
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/${PHOTO_FN}`, {
+      method: "POST",
+      headers: { "content-type": "application/json",
+                 apikey: SUPABASE_ANON_KEY, authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ mode: "view", token }),
+    });
+    const text = await r.text();
+    row(`사진 함수 (${PHOTO_FN})`, r.ok, `HTTP ${r.status}\n${text.slice(0, 500)}`,
+      r.ok ? "" :
+      r.status === 404 ? "함수 이름이 config.js 와 다릅니다. Supabase 주소창의 /functions/<이름>/details 를 확인해주세요."
+      : r.status === 401 ? "Edge Functions → 이 함수 → Settings → <b>Verify JWT 끄기</b>"
+      : "위 내용을 그대로 알려주세요");
+  } catch (e) {
+    row(`사진 함수 (${PHOTO_FN})`, false, String(e),
+      "CORS 또는 연결 실패입니다. Verify JWT 가 켜져 있으면 이렇게 보입니다.");
+  }
+}
+</script>
+</body></html>
