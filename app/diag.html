@@ -32,6 +32,13 @@
 
 <script type="module">
 import { SUPABASE_URL, SUPABASE_ANON_KEY, PHOTO_FN, RESOLVE_FN } from "./assets/config.js";
+/* ★ 토큰은 앱과 "같은 함수"로 읽습니다.
+
+   처음에는 localStorage.getItem 으로 직접 읽었는데, 앱은 값을
+   JSON 으로 감싸 저장합니다. 그래서 따옴표까지 붙은 채로 서버에
+   보내게 되고, 서버는 당연히 "만료됐다"고 답합니다.
+   진단 도구가 거짓말을 하면 멀쩡한 곳을 몇 시간씩 파게 됩니다. */
+import { getToken, recentRooms } from "./assets/session.js";
 
 const out = document.getElementById("out");
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
@@ -48,20 +55,16 @@ function row(title, ok, body, hint) {
   return ok;
 }
 
-/* 방 주소 찾기 — 주소창에 있으면 그걸, 없으면 저장된 것 중 아무거나 */
-function findSlug() {
-  const q = new URL(location.href).searchParams.get("r");
-  if (q) return q.toUpperCase();
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    const m = k && k.match(/^trip\.([23456789BCDFGHJKMNPQRSTVWXZ]{9})\.tok$/);
-    if (m) return m[1];
-  }
-  return null;
+/* 이 브라우저가 아는 방들 — 여러 개면 어느 걸 봤는지 밝힙니다 */
+const rooms = [];
+for (let i = 0; i < localStorage.length; i++) {
+  const k = localStorage.key(i);
+  const m = k && k.match(/^trip\.([23456789BCDFGHJKMNPQRSTVWXZ]{9})\.tok$/);
+  if (m) rooms.push(m[1]);
 }
-
-const slug = findSlug();
-const token = slug ? localStorage.getItem(`trip.${slug}.tok`) : null;
+const asked = (new URL(location.href).searchParams.get("r") || "").toUpperCase();
+const slug = asked || rooms[rooms.length - 1] || null;   // 최근 것 우선
+const token = slug ? getToken(slug) : null;
 
 row("설정", !!(SUPABASE_URL && SUPABASE_ANON_KEY),
   `주소     ${SUPABASE_URL || "(비어 있음)"}\n` +
@@ -69,9 +72,14 @@ row("설정", !!(SUPABASE_URL && SUPABASE_ANON_KEY),
   `사진함수 ${PHOTO_FN}\n링크함수 ${RESOLVE_FN}`);
 
 row("방 입장 정보", !!token,
-  slug ? `방 주소  ${slug}\n토큰     ${token ? token.slice(0, 12) + "… (" + token.length + "자)" : "없음"}`
-       : "이 브라우저에 입장한 방이 없습니다",
-  token ? "" : "먼저 방에 들어갔다 와서 이 페이지를 다시 열어주세요.");
+  (slug ? `보고 있는 방  ${slug}\n토큰          ${token ? token.slice(0, 12) + "… (" + token.length + "자)" : "없음"}`
+        : "이 브라우저에 입장한 방이 없습니다") +
+  (rooms.length > 1 ? `\n이 브라우저가 아는 방  ${rooms.join(", ")}` : ""),
+  token
+    ? (rooms.length > 1
+        ? "다른 방을 보려면 주소 끝에 <code>?r=방주소</code> 를 붙이세요."
+        : "")
+    : "먼저 방에 들어갔다 와서 이 페이지를 다시 열어주세요.");
 
 /* 서버가 살아 있는가 */
 try {
@@ -102,7 +110,9 @@ if (token) {
         ? "0008_photos.sql 을 <b>다시 Run</b> 해주세요 (photo_list 가 옛 정의입니다)"
         : /PGRST202|does not exist/i.test(text)
           ? "0008_photos.sql 을 Run 해주세요 (기능이 아직 없습니다)"
-          : "위 내용을 그대로 알려주세요");
+          : /expired|만료/i.test(text)
+            ? "이 방의 입장 정보가 만료됐습니다. 방에 다시 들어갔다 와서 이 페이지를 새로고침해주세요."
+            : "위 내용을 그대로 알려주세요");
   } catch (e) {
     row("사진 목록 (DB)", false, String(e));
   }
