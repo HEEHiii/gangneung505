@@ -345,6 +345,56 @@ Storage 화면에서 버킷을 공개(public)로 바꿀 수 있는데, **절대 
 
 ---
 
+## 선택 — 어느 탭을 쓰는지 보기
+
+친구들이 **어느 탭을 실제로 여는지** 숫자로 볼 수 있습니다.
+정산 탭처럼 "이거 쓰기는 하나?" 싶은 기능을 판단할 때 씁니다.
+
+SQL Editor 에
+[`0010_tabstats.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0010_tabstats.sql)
+붙여넣고 **Run**. 끝입니다 — 따로 넣을 설정이 없습니다.
+
+그 뒤 **로그인한 상태로 첫 화면**에 들어가면 "내 여행방" 아래에
+막대 그래프가 생깁니다.
+
+> **무엇이 기록되나요**
+> 날짜, 탭 이름, 숫자. 이 셋뿐입니다.
+> **누가 눌렀는지도, 어느 방인지도 저장하지 않습니다.**
+> 그래서 이 표는 접속 기록이 아니고, 개인정보로 다룰 것이 없습니다.
+>
+> 한 사람이 하루에 한 탭을 열면 1 입니다. 탭을 백 번 오가도 1 입니다.
+> ("몇 번 눌렸나"로 세면 지도가 있는 탭이 무조건 이겨서, 숫자를 봐도
+> 알 수 있는 게 없습니다.)
+
+> **지금 안 돌려도 됩니다.** 사이트는 그대로 돌아가고, 통계 칸만
+> 안 보입니다. 다만 **기록은 Run 한 날부터 쌓입니다** — 지난 일은
+> 나중에 되살릴 수 없어서, 궁금해질 것 같으면 미리 돌려두는 편이 낫습니다.
+
+### 탭을 연 횟수보다 나은 숫자
+
+탭 숫자는 "열어봤다"만 말해줍니다. 호기심에 한 번 열어본 것과
+매일 쓰는 것이 똑같이 1 로 세집니다.
+
+**어떤 기능이 실제로 쓰였는지**는 이미 쌓인 자료로 바로 알 수 있습니다.
+SQL Editor 에 붙여넣고 Run 하세요 — 이건 **지금 당장** 됩니다
+(0010 을 안 돌렸어도 됩니다):
+
+```sql
+select
+  (select count(*) from app.rooms)                                as 방,
+  (select count(distinct room_id) from app.expenses)              as 지출을_적은_방,
+  (select count(distinct room_id) from app.photos
+     where deleted_at is null)                                    as 사진을_올린_방,
+  (select count(distinct room_id) from app.comments
+     where deleted_at is null)                                    as 댓글이_달린_방,
+  (select count(distinct room_id) from app.itinerary_days)        as 일정을_저장한_방;
+```
+
+"방 10개 중 지출을 적은 방 1개" 는 탭을 몇 번 열었는지보다
+훨씬 분명한 답입니다.
+
+---
+
 ## 흔한 실수 세 가지
 
 | 틀리기 쉬운 것 | 맞는 것 | 증상 |

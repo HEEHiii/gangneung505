@@ -18,7 +18,7 @@ import { hasBackend, hasMap, roomUrl, KAKAO_JS_KEY, loginName } from "./config.j
 import { loadKakao, kakaoReady } from "./kakaomap.js";
 import { searchByKeyword, findHub } from "./places.js";
 import { currentUser, signIn, readReturn, sweepPending, signOut } from "./auth.js";
-import { createRoom, listMyRooms } from "./store.js";
+import { createRoom, listMyRooms, tabReport } from "./store.js";
 import { rememberRoom, recentRooms } from "./session.js";
 
 /* 직접 검색으로 고른 곳 (지역 목록에 없는 경우) */
@@ -295,6 +295,56 @@ async function showMyRooms() {
 
 
 /* ============================================================
+   어느 탭을 쓰는지 — 방을 만든 사람에게만 보입니다
+
+   ★ 0010 마이그레이션을 안 돌렸으면 이 칸이 아예 안 뜹니다.
+     없는 기능을 "오류"로 보여줄 이유가 없습니다.
+
+   ★ 숫자를 읽는 법은 화면에 같이 적어둡니다. "정산 12" 를
+     혼자 보면 많은 건지 적은 건지 알 수 없고, 사람이 적을 때
+     이 숫자로 기능을 지우는 판단을 하면 거의 틀립니다.
+   ============================================================ */
+const TAB_LABEL = {
+  stay: "숙소", food: "맛집", plan: "일정", money: "정산", photo: "사진",
+};
+
+async function showUsage() {
+  const box = $("#usage"), list = $("#usage-list"), note = $("#usage-note");
+
+  let rows = [];
+  try {
+    const me = await currentUser();
+    if (!me) return;                 // 방장이 아니면 보여주지 않습니다
+    rows = await tabReport(90);
+  } catch (_) { return; }            // 함수가 없거나 로그인이 끊겼으면 조용히
+
+  if (!Array.isArray(rows) || !rows.length) return;
+
+  const top = Math.max(...rows.map((r) => Number(r.views) || 0), 1);
+  const sum = rows.reduce((a, r) => a + (Number(r.views) || 0), 0);
+  const since = rows
+    .map((r) => r.first_day).filter(Boolean).sort()[0];
+
+  box.hidden = false;
+  list.innerHTML = rows.map((r) => {
+    const n = Number(r.views) || 0;
+    const pct = Math.round((n / top) * 100);
+    return `
+      <li>
+        <span class="usage-name">${esc(TAB_LABEL[r.tab] || r.tab)}</span>
+        <span class="usage-bar"><span style="width:${pct}%"></span></span>
+        <span class="usage-num">${n}</span>
+      </li>`;
+  }).join("");
+
+  note.textContent =
+    `한 사람이 하루에 한 탭을 열면 1 로 셉니다` +
+    (since ? ` (${esc(since)} 부터, 모두 ${sum})` : ` (모두 ${sum})`) +
+    `. 방이나 사람은 기록하지 않아요.`;
+}
+
+
+/* ============================================================
    시작
    ============================================================ */
 async function boot() {
@@ -393,6 +443,7 @@ async function boot() {
   }
 
   showMyRooms();
+  showUsage();            // 방장에게만, 실패하면 조용히 사라집니다
   window.__landingReady = true;
 }
 

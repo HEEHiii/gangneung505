@@ -278,6 +278,9 @@ function showTab(name) {
   if (tab === "photo" && !inited.photo) initPhoto();
   // 숨어 있던 지도는 보일 때 다시 그려야 합니다
   if (maps[tab]) maps[tab].refresh();
+
+  // 어느 탭이 실제로 쓰이는지 (하루 한 번, 실패해도 조용히)
+  if (store && store.tabSeen) store.tabSeen(tab);
 }
 
 

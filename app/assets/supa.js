@@ -49,6 +49,8 @@ export const RPC = {
   photo_add:    ["p_token", "p_voter", "p_key", "p_thumb",
                  "p_width", "p_height", "p_bytes", "p_caption", "p_nick"],
   photo_remove: ["p_token", "p_voter", "p_id"],
+  // 어느 탭을 쓰는지 세기. 방도 사람도 기록하지 않습니다 (0010 주석 참고)
+  tab_seen:     ["p_token", "p_tab"],
 
   /* ---- 로그인한 방장만 ---- */
   room_create: [
@@ -61,12 +63,14 @@ export const RPC = {
   room_resume:       ["p_slug"],
   room_set_password: ["p_slug", "p_new"],
   room_delete:       ["p_slug"],
+  tab_report:        ["p_days"],
 };
 
 /* 로그인이 필요한 호출 — 미리 걸러서 친절한 메시지를 냅니다 */
 export const NEEDS_LOGIN = new Set([
   "room_create", "room_list_mine", "room_resume",
   "room_set_password", "room_delete",
+  "tab_report",
 ]);
 
 

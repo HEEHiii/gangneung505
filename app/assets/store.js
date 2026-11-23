@@ -184,6 +184,12 @@ export async function listMyRooms() {
   return await rpc("room_list_mine");
 }
 
+/* 어느 탭을 많이 쓰는지 (로그인한 사람만) */
+export async function tabReport(days = 30) {
+  if (!hasBackend()) return [];
+  return await rpc("tab_report", { p_days: days });
+}
+
 /* 방장이 비밀번호 없이 다시 들어가기 */
 export async function resumeRoom(slug) {
   if (!hasBackend()) return { token: LOCAL_TOKEN };
@@ -810,6 +816,29 @@ export function createStore(slug) {
         return { ok: true };
       }
       return await rpc("photo_remove", { p_token: need(), p_voter: voter, p_id: id });
+    },
+
+    /* ---------- 어느 탭을 열었는지 (하루 한 번) ----------
+
+       ★ 실패해도 아무 말 하지 않습니다.
+         0010 마이그레이션을 아직 안 돌렸으면 Supabase 가
+         "함수가 없다(PGRST202)"고 답하는데, 그건 사용자가
+         알 바가 아닙니다. 여행 계획을 세우러 온 사람에게
+         통계 수집이 고장났다고 알릴 이유가 없습니다.
+
+       ★ 보내기 전에 날짜로 한 번 거릅니다. 탭을 오가도
+         하루에 탭마다 한 번만 나갑니다 (0010 주석 참고).
+         덤으로 전송량도 거의 0 이 됩니다. */
+    async tabSeen(tab) {
+      if (!online) return;
+      const today = new Date().toISOString().slice(0, 10);
+      const key = `trip.${slug}.seen.${tab}`;
+      try {
+        if (localStorage.getItem(key) === today) return;
+        localStorage.setItem(key, today);
+      } catch (_) { /* 저장을 막아둔 브라우저면 그냥 보냅니다 */ }
+      try { await rpc("tab_seen", { p_token: need(), p_tab: tab }); }
+      catch (_) {}
     },
 
     /* ---------- 아직 쓰는 방이라고 표시 ---------- */

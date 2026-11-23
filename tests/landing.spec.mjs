@@ -410,6 +410,25 @@ console.log("── 테마 고르기 탭 영역");
   await ctx.close();
 }
 
+/* ============================================================
+   탭 사용 칸 — 설정이 없으면 조용히 숨는다
+
+   ★ 0010 마이그레이션을 안 돌린 사람에게 빈 표나 오류가
+     보이면 안 됩니다. 통계는 있으면 좋은 것이지, 사이트가
+     돌아가는 조건이 아닙니다.
+   ============================================================ */
+{
+  console.log("── 탭 사용 칸");
+  const { ctx, page, errors } = await open();
+
+  eq(await page.locator("#usage").isVisible(), false,
+    "★ 설정이 없으면 통계 칸이 아예 안 보인다");
+  eq(errors.length, 0,
+    `통계 때문에 콘솔 오류가 나지 않는다${errors.length ? " — " + errors[0] : ""}`);
+
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");

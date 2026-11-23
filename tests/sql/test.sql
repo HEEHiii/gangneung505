@@ -1042,6 +1042,83 @@ select pg_temp.ok(
 
 
 -- ============================================================
+--  9.12 탭 사용 수
+--
+--  ★ 제일 중요한 검사는 "센다"가 아니라 "사람·방을 기록하지
+--    않는다" 입니다. 나중에 누군가(저를 포함해) 편리하다는
+--    이유로 room_id 를 한 칸 더하면, 이 표는 접속 기록이 되고
+--    개인정보가 됩니다. 칸이 늘어나면 검사가 깨지게 둡니다.
+-- ============================================================
+\echo '── 9.12 탭 사용 수'
+reset role;
+
+select pg_temp.ok(
+  (select array_agg(a.attname::text order by a.attname)
+     from pg_attribute a
+     join pg_class c on c.oid = a.attrelid
+     join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'app' and c.relname = 'tab_views'
+      and a.attnum > 0 and not a.attisdropped)
+    = array['tab', 'the_date', 'views'],
+  '★ 탭 표에는 날짜·탭·숫자뿐이다 (사람도 방도 없다)');
+
+set role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', false);
+
+select public.tab_seen((select v::jsonb ->> 'token' from t where k = 'tok1b'), 'money');
+select public.tab_seen((select v::jsonb ->> 'token' from t where k = 'tok1b'), 'money');
+select public.tab_seen((select v::jsonb ->> 'token' from t where k = 'tok1b'), 'stay');
+-- 모르는 이름은 버립니다
+select public.tab_seen((select v::jsonb ->> 'token' from t where k = 'tok1b'), 'nonsense');
+
+reset role;
+select pg_temp.ok(
+  (select views from app.tab_views where tab = 'money' and the_date = current_date) = 2,
+  '같은 탭을 두 번 보면 2 가 된다');
+select pg_temp.ok(
+  (select views from app.tab_views where tab = 'stay' and the_date = current_date) = 1,
+  '다른 탭은 따로 센다');
+select pg_temp.ok(
+  not exists (select 1 from app.tab_views where tab = 'nonsense'),
+  '모르는 탭 이름은 버린다');
+
+-- 토큰이 틀리면 세지 않습니다 (바깥에서 숫자를 부풀리지 못하게)
+do $$
+declare v_blocked boolean := false;
+begin
+  set local role anon;
+  begin
+    perform public.tab_seen('아무거나-가짜-토큰', 'money');
+  exception when others then v_blocked := true;
+  end;
+  reset role;
+  perform pg_temp.ok(v_blocked, '★ 가짜 토큰으로는 숫자를 부풀릴 수 없다');
+end $$;
+
+-- 보는 것은 로그인한 사람만
+do $$
+declare v_blocked boolean := false;
+begin
+  set local role anon;
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  begin
+    perform * from public.tab_report(30);
+  exception when others then v_blocked := true;
+  end;
+  reset role;
+  perform pg_temp.ok(v_blocked, '로그인 없이는 통계를 못 본다');
+end $$;
+
+set role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111"}', false);
+select pg_temp.ok(
+  (select views from public.tab_report(30) where tab = 'money') = 2,
+  '로그인하면 숫자가 보인다');
+reset role;
+
+
+-- ============================================================
 --  10. 방 삭제는 자식까지 함께
 -- ============================================================
 \echo '── 10. 방 삭제'
