@@ -924,8 +924,13 @@ select public.photo_remove(
 reset role;
 select pg_temp.ok((select count(*) from app.photos where deleted_at is null) = 0,
   '내가 올린 사진은 지울 수 있다');
-select pg_temp.ok((select count(*) from app.photos) = 1,
-  '지워도 행은 남는다 (R2 파일을 나중에 정리할 수 있게)');
+/* ★ 0012 전에는 "지워도 행은 남는다" 였습니다. 보관함의 파일을
+   나중에 정리하려면 파일 이름이 있어야 해서였는데, 그 역할을
+   app.photo_trash 가 대신합니다. 줄을 남겨두면 트리거가 안 돌고,
+   방 삭제·탈퇴로 줄이 cascade 로 사라질 때 이름을 놓칩니다.
+   이제는 줄을 지우고 이름만 휴지통에 남깁니다 (9.14 참고). */
+select pg_temp.ok((select count(*) from app.photos) = 0,
+  '지운 사진은 줄까지 사라진다');
 
 
 -- ============================================================
@@ -1188,6 +1193,94 @@ reset role;
 
 
 -- ============================================================
+--  9.14 지운 사진의 파일 이름이 휴지통에 남는가
+--
+--  ★ 이것이 "지웠습니다" 라고 말할 수 있는지를 가르는 검사입니다.
+--    DB 줄만 지우고 보관함의 파일이 남으면, 얼굴이 담긴 파일이
+--    그대로 있는 것이라 지웠다고 할 수 없습니다.
+-- ============================================================
+\echo '── 9.14 사진 휴지통'
+reset role;
+delete from app.photo_trash;
+
+set role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', false);
+
+insert into t select 'pa2', (public.photo_allow(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b')))::text;
+
+insert into t select 'ph2', (public.photo_add(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A',
+  (select v::jsonb ->> 'key' from t where k = 'pa2'),
+  (select v::jsonb ->> 'key' from t where k = 'pa2') || '-t',
+  1600, 1067, 250000, '두번째', '민수')) ->> 'id';
+
+insert into t select 'rm2', (public.photo_remove(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A',
+  (select v::uuid from t where k = 'ph2')))::text;
+
+reset role;
+select pg_temp.ok(
+  not exists (select 1 from app.photos where id = (select v::uuid from t where k = 'ph2')),
+  '지운 사진은 줄까지 사라진다 (표시만 남기지 않는다)');
+
+select pg_temp.ok(
+  jsonb_array_length((select v::jsonb -> 'keys' from t where k = 'rm2')) = 2,
+  '지울 때 파일 이름 둘을 돌려준다 (원본·썸네일)');
+
+select pg_temp.ok(
+  (select count(*) from app.photo_trash) = 2,
+  '★ 파일 이름이 휴지통에 남는다');
+
+select pg_temp.ok(
+  exists (select 1 from app.photo_trash
+           where key = (select v::jsonb ->> 'key' from t where k = 'pa2')),
+  '휴지통에 든 이름이 그 사진의 것이다');
+
+-- 휴지통은 명단에 있는 사람만 만질 수 있습니다
+do $$
+declare v_blocked boolean := false;
+begin
+  set local role anon;
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  begin
+    perform * from public.photo_trash_take(10);
+  exception when others then v_blocked := true;
+  end;
+  reset role;
+  perform pg_temp.ok(v_blocked, '로그인 없이는 휴지통을 못 본다');
+end $$;
+
+set role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-111111111111"}', false);
+select pg_temp.ok(
+  (select count(*) from public.photo_trash_take(10)) = 2,
+  '명단에 있으면 휴지통을 본다');
+select pg_temp.ok(
+  -- authenticated 는 app 스키마를 직접 못 읽습니다 (그게 맞습니다).
+  -- 이름은 take 로 받아옵니다 — 실제 사용 흐름과도 같습니다.
+  (public.photo_trash_clear(array(select key from public.photo_trash_take(10)))
+     ->> 'cleared')::int = 2,
+  '치운 뒤에는 휴지통에서 뺀다');
+reset role;
+select pg_temp.ok((select count(*) from app.photo_trash) = 0, '휴지통이 비었다');
+
+-- 방 삭제·탈퇴 때를 보려면, 그때까지 살아 있는 사진이 하나 필요합니다.
+-- 이건 지우지 않고 둡니다 (아래 10번에서 확인합니다).
+set role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', false);
+insert into t select 'pa3', (public.photo_allow(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b')))::text;
+select public.photo_add(
+  (select v::jsonb ->> 'token' from t where k = 'tok1b'), 'voter-A',
+  (select v::jsonb ->> 'key' from t where k = 'pa3'),
+  (select v::jsonb ->> 'key' from t where k = 'pa3') || '-t',
+  800, 600, 90000, '방 지울 때까지 남겨둘 사진', '민수');
+reset role;
+
+
+-- ============================================================
 --  10. 방 삭제는 자식까지 함께
 -- ============================================================
 \echo '── 10. 방 삭제'
@@ -1201,9 +1294,17 @@ select pg_temp.ok(not exists (select 1 from app.rooms where slug = (select v fro
 select pg_temp.ok(not exists (select 1 from app.places where id = (select (v::jsonb ->> 'id')::uuid from t where k = 'place1')), '방 삭제 시 장소도 함께');
 select pg_temp.ok((select count(*) from app.votes) = 0, '방 삭제 시 투표도 함께');
 
+-- ★ 방을 지울 때도 파일 이름이 휴지통에 남아야 합니다.
+--   여기가 어려운 쪽입니다 — cascade 로 줄이 사라지는 순간
+--   파일 이름도 같이 사라지면, 나중에는 어떤 파일이 버려진
+--   것인지 알 방법이 없습니다. 트리거가 그래서 필요합니다.
+select pg_temp.ok((select count(*) from app.photo_trash) > 0,
+  '★ 방을 지워도 파일 이름은 휴지통에 남는다');
+
 -- 카카오 탈퇴 = 사용자 삭제 → 그 사람 방 전부 사라짐
 delete from auth.users where id = '22222222-2222-2222-2222-222222222222';
 select pg_temp.ok((select count(*) from app.rooms) = 0, '사용자 탈퇴 시 그 사람 방도 사라짐 (cascade)');
+select pg_temp.ok((select count(*) from app.photos) = 0, '탈퇴 시 사진 기록도 사라짐');
 
 \echo ''
 \echo '════ SQL 테스트 전부 통과 ════'

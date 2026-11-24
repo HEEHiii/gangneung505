@@ -16,7 +16,7 @@
      그래서 화면 코드에 "서버 있나?" 분기가 한 줄도 없습니다.
    ============================================================ */
 
-import { rpc, RpcError } from "./supa.js";
+import { rpc, RpcError, getClient } from "./supa.js";
 import { hasBackend, SUPABASE_URL, SUPABASE_ANON_KEY, RESOLVE_FN,
          PHOTO_FN } from "./config.js";
 import { voterKey, newId } from "./session.js";
@@ -189,6 +189,39 @@ export async function tabReport(days = 30) {
   if (!hasBackend()) return [];
   return await rpc("tab_report", { p_days: days });
 }
+
+/* 지운 사진의 파일 치우기 (명단에 있는 사람만)
+
+   방을 지우거나 카카오 계정을 탈퇴하면 DB 줄은 cascade 로
+   사라지는데, 그때 보관함의 파일은 우리 코드가 끼어들 틈 없이
+   남습니다. DB 트리거가 적어둔 이름을 여기서 꺼내 치웁니다.
+
+   한 번에 200개씩 치웁니다. 더 남아 있으면 다시 누르면 됩니다. */
+export async function sweepPhotoTrash() {
+  if (!hasBackend()) return { ok: true, removed: 0 };
+
+  const client = await getClient();
+  const { data } = client ? await client.auth.getSession() : { data: null };
+  const jwt = data && data.session ? data.session.access_token : "";
+  if (!jwt) throw new RpcError("auth", "로그인이 필요해요.", "no session");
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${PHOTO_FN}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+      authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ mode: "sweep", jwt }),
+  });
+  const got = await res.json().catch(() => null);
+  if (!res.ok || !got || got.ok !== true) {
+    throw new RpcError(got?.code || "db",
+      got?.message || "정리하지 못했어요", `sweep ${res.status}`);
+  }
+  return got;
+}
+
 
 /* 방장이 비밀번호 없이 다시 들어가기 */
 export async function resumeRoom(slug) {
@@ -815,7 +848,24 @@ export function createStore(slug) {
         lwrite(slug, box);
         return { ok: true };
       }
-      return await rpc("photo_remove", { p_token: need(), p_voter: voter, p_id: id });
+      /* ★ RPC 를 직접 부르지 않고 Edge Function 을 거칩니다.
+         DB 줄만 지우면 보관함의 파일이 남고, 파일을 지울 수 있는
+         자격(service_role)은 그 함수 안에만 있습니다. */
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/${PHOTO_FN}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          apikey: SUPABASE_ANON_KEY,
+          authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ mode: "delete", token: need(), voter, id }),
+      });
+      const got = await res.json().catch(() => null);
+      if (!res.ok || !got || got.ok !== true) {
+        throw new RpcError(got?.code || "db",
+          got?.message || "사진을 지우지 못했어요", `photo delete ${res.status}`);
+      }
+      return { ok: true };
     },
 
     /* ---------- 어느 탭을 열었는지 (하루 한 번) ----------

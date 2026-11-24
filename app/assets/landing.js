@@ -18,7 +18,7 @@ import { hasBackend, hasMap, roomUrl, KAKAO_JS_KEY, loginName } from "./config.j
 import { loadKakao, kakaoReady } from "./kakaomap.js";
 import { searchByKeyword, findHub } from "./places.js";
 import { currentUser, signIn, readReturn, sweepPending, signOut } from "./auth.js";
-import { createRoom, listMyRooms, tabReport } from "./store.js";
+import { createRoom, listMyRooms, tabReport, sweepPhotoTrash } from "./store.js";
 import { rememberRoom, recentRooms } from "./session.js";
 
 /* 직접 검색으로 고른 곳 (지역 목록에 없는 경우) */
@@ -473,6 +473,27 @@ async function boot() {
   $("#signout").addEventListener("click", async () => {
     await signOut();
     location.reload();
+  });
+
+  /* 지운 사진 파일 치우기 — 통계 칸 안에 있으므로 관리자만 봅니다.
+
+     ★ 평소에는 누를 일이 없습니다. 사진을 지우면 그 자리에서 파일도
+       함께 지워집니다. 이 버튼은 방 삭제나 카카오 탈퇴처럼 우리가
+       끼어들 수 없었던 경우에 남은 파일을 치우는 용도입니다. */
+  $("#sweep").addEventListener("click", async () => {
+    const btn = $("#sweep"), note = $("#sweep-note");
+    btn.disabled = true;
+    note.textContent = "정리하는 중…";
+    try {
+      const got = await sweepPhotoTrash();
+      note.textContent = got.removed
+        ? `파일 ${got.removed}개를 지웠어요. 더 있으면 한 번 더 눌러주세요.`
+        : "치울 파일이 없어요. 깨끗합니다.";
+    } catch (e) {
+      note.textContent = (e && e.message) || "정리하지 못했어요.";
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   showMyRooms();

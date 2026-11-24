@@ -57,8 +57,8 @@ Deno.serve(async (req) => {
                   message: "사진 보관함이 아직 준비되지 않았어요" }, 503);
   }
 
-  let body: { mode?: string; token?: string; voter?: string;
-              bytes?: number; thumbBytes?: number };
+  let body: { mode?: string; token?: string; voter?: string; id?: string;
+              jwt?: string; bytes?: number; thumbBytes?: number };
   try { body = await req.json(); } catch { return json({ ok: false, code: "bad" }, 400); }
   const token = String(body.token || "");
 
@@ -91,6 +91,101 @@ Deno.serve(async (req) => {
     });
     return { ok: r.ok, status: r.status, data: await r.json().catch(() => null) };
   };
+
+  /* 보관함에서 파일을 지웁니다 (여러 개 한 번에).
+     Supabase 저장소의 삭제는 DELETE + {prefixes} 입니다. */
+  const storageRemove = async (paths: string[]) => {
+    if (!paths.length) return { ok: true, removed: 0 };
+    const r = await fetch(`${URL_}/storage/v1/object/${BUCKET}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", apikey: SERVICE,
+                 authorization: `Bearer ${SERVICE}` },
+      body: JSON.stringify({ prefixes: paths }),
+    });
+    const data = await r.json().catch(() => null);
+    return { ok: r.ok, removed: Array.isArray(data) ? data.length : 0, data };
+  };
+
+  /* ================= 사진 지우기 =================
+
+     ★ 왜 이 함수를 거치나: 브라우저가 photo_remove 를 직접 불러도
+       DB 줄은 지워지지만 보관함의 파일은 남습니다. 파일을 지울 수
+       있는 건 service_role 뿐이고, 그 열쇠는 여기에만 있습니다.
+
+     ★ 파일 삭제가 실패해도 성공으로 답합니다. DB 에서는 이미
+       사라져서 아무도 볼 수 없고, 파일 이름은 휴지통에 적혀
+       있으니 나중에 정리됩니다. 사용자에게 알릴 일이 아닙니다. */
+  if (body.mode === "delete") {
+    const got = await rpc("photo_remove",
+      { p_token: token, p_voter: voter, p_id: String(body.id || "") });
+
+    if (!got.ok) {
+      const msg = String((got.data as Record<string, unknown>)?.message || "");
+      if (/function.*does not exist|could not find.*function|PGRST202/i.test(msg)) {
+        return json({ ok: false, code: "nosql",
+          message: "사진 표가 아직 없어요 (0012_photo_trash.sql 을 돌려주세요)" }, 424);
+      }
+      if (/직접 올린|없는 사진/.test(msg)) {
+        return json({ ok: false, code: "denied", message: msg }, 403);
+      }
+      if (/expired|입장/.test(msg)) {
+        return json({ ok: false, code: "expired", message: "다시 입장해주세요" }, 403);
+      }
+      return json({ ok: false, code: "db",
+                    message: msg || "사진을 지우지 못했어요" }, 424);
+    }
+
+    const keys = ((got.data as { keys?: unknown })?.keys ?? []) as unknown[];
+    await storageRemove(keys.map(String).filter(Boolean));
+    return json({ ok: true });
+  }
+
+  /* ================= 휴지통 비우기 (관리자) =================
+
+     방을 지우거나 카카오 계정을 탈퇴하면 DB 줄이 cascade 로
+     사라지면서 파일만 보관함에 남습니다. 그때 트리거가 적어둔
+     이름을 여기서 꺼내 파일을 지웁니다.
+
+     ★ 관리자인지는 DB 가 판단합니다. 사용자의 로그인 증표를
+       그대로 넘겨서 photo_trash_take 를 부르면, 명단에 없는
+       사람에게는 DB 가 거절합니다. 이 함수는 판단하지 않습니다. */
+  if (body.mode === "sweep") {
+    const jwt = String(body.jwt || "");
+    if (!jwt) return json({ ok: false, code: "auth",
+                            message: "로그인이 필요해요" }, 401);
+
+    const asUser = async (fn: string, args: unknown) => {
+      const r = await fetch(`${URL_}/rest/v1/rpc/${fn}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", apikey: ANON,
+                   authorization: `Bearer ${jwt}` },
+        body: JSON.stringify(args),
+      });
+      return { ok: r.ok, data: await r.json().catch(() => null) };
+    };
+
+    const take = await asUser("photo_trash_take", { p_limit: 200 });
+    if (!take.ok) {
+      return json({ ok: false, code: "denied",
+                    message: "정리할 권한이 없어요" }, 403);
+    }
+    const keys = (Array.isArray(take.data) ? take.data : [])
+      .map((row: Record<string, unknown>) => String(row?.key || ""))
+      .filter(Boolean);
+
+    if (!keys.length) return json({ ok: true, removed: 0, left: 0 });
+
+    const gone = await storageRemove(keys);
+    if (!gone.ok) {
+      return json({ ok: false, code: "storage",
+                    message: "보관함에서 지우지 못했어요" }, 502);
+    }
+
+    /* ★ 보관함에서 지운 것만 휴지통에서 뺍니다. 지우지 못한 이름이
+       남아 있어야 다음에 다시 시도합니다. */
+    await asUser("photo_trash_clear", { p_keys: keys });
+    return json({ ok: true, removed: keys.length });
+  }
 
   /* ================= 보기 ================= */
   if (body.mode === "view") {

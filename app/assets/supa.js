@@ -65,13 +65,15 @@ export const RPC = {
   room_set_password: ["p_slug", "p_new"],
   room_delete:       ["p_slug"],
   tab_report:        ["p_days"],
+  photo_trash_take:  ["p_limit"],
+  photo_trash_clear: ["p_keys"],
 };
 
 /* 로그인이 필요한 호출 — 미리 걸러서 친절한 메시지를 냅니다 */
 export const NEEDS_LOGIN = new Set([
   "room_create", "room_list_mine", "room_resume",
   "room_set_password", "room_delete",
-  "tab_report",
+  "tab_report", "photo_trash_take", "photo_trash_clear",
 ]);
 
 

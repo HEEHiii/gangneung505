@@ -342,6 +342,13 @@ SQL Editor 에 **순서대로** 붙여넣고 Run:
 
 1. [`0008_photos.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0008_photos.sql) — 사진 목록 표
 2. [`0009_photo_bucket.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0009_photo_bucket.sql) — 사진함 (비공개로)
+3. [`0012_photo_trash.sql`](https://github.com/HEEHiii/gangneung505/blob/main/supabase/migrations/0012_photo_trash.sql) — 지운 사진의 **파일까지** 지우기
+
+> ⚠️ `0012` 를 올린 뒤에는 **아래 2번 함수를 반드시 다시 배포**하세요.
+> 표만 바꾸고 함수를 그대로 두면 파일이 계속 남습니다.
+>
+> `0012` 는 `0011` 이 만드는 "관리자 명단"을 씁니다. 번호 순서대로
+> `0010` → `0011` → `0012` 로 올리세요.
 
 ### 2) 함수 올리기
 
