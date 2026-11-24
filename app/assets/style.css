@@ -1125,7 +1125,7 @@ body{
    브라우저는 "사용자가 보던 것(댓글)"을 계속 보여주려고 같이
    스크롤합니다. 그 결과 사진은 화면 위로 사라집니다.
    친절한 기능인데 여기서는 반대로 작동합니다. */
-#photo-view, .photo-box{overflow-anchor:none}
+#photo-view, .photo-box, #card-view, .card-box{overflow-anchor:none}
 
 /* ★ 사진이 먼저, 통째로 보여야 합니다.
 
@@ -1182,3 +1182,26 @@ body{
 .card h3:first-of-type { margin-top: 6px; }
 .card p + .how-list { margin-top: 10px; }
 .foot a { color: inherit; }
+
+
+/* ───────── 스토리 카드 미리보기 ───────── */
+.card-box { max-width: 340px; }
+.card-box #card-img {
+  display: block;
+  width: 100%;
+  /* ★ src 를 넣기 전에 자리를 잡아둡니다. 늦게 들어온 그림이 아래
+     내용을 밀어내면 보던 자리가 튑니다 (사진 창에서 겪은 일). */
+  aspect-ratio: 9 / 16;
+  border-radius: var(--r);
+  background: var(--surface-2);
+  object-fit: contain;
+}
+.card-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 2px;
+  font-size: .95rem;
+  cursor: pointer;
+}
+.card-opt input[type="checkbox"] { width: auto; margin: 0; }

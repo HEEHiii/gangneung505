@@ -91,3 +91,52 @@ export async function copyText(text) {
     return false;
   }
 }
+
+
+/* ------------------------------------------------------------
+   파일 하나를 사용자에게 건네기 — 사진과 스토리 카드가 같이 씁니다
+
+   ★ 폰에서는 <a download> 가 사진첩에 안 넣어줍니다. 공유 시트를
+     띄워야 "이미지 저장" 이 나옵니다. 그래서 공유를 먼저 시도하고,
+     안 되는 데스크톱에서만 내려받기로 갑니다.
+
+   ★ AbortError 는 사용자가 공유 시트를 닫은 것입니다. 그때 내려받기로
+     넘어가면, 취소했는데 파일이 떨어집니다. 조용히 끝냅니다.
+
+   돌려주는 값: "shared" | "downloaded" | "cancelled" | "failed"
+   ------------------------------------------------------------ */
+export async function saveBlob(blob, name) {
+  if (!blob) return "failed";
+
+  try {
+    const file = new File([blob], name, { type: blob.type || "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      return "shared";
+    }
+  } catch (e) {
+    if (e && e.name === "AbortError") return "cancelled";
+    /* 공유가 안 되면 아래 내려받기로 */
+  }
+
+  try {
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 1000);
+    return "downloaded";
+  } catch (_) {
+    return "failed";
+  }
+}
+
+/* 폰이면 "저장 · 보내기", 아니면 "저장" — 공유 시트가 뜨는지로 가릅니다 */
+export function saveLabel(what) {
+  const phone = typeof navigator !== "undefined"
+    && navigator.canShare && /iPhone|iPad|Android/i.test(navigator.userAgent || "");
+  return phone ? `${what} · 보내기` : `${what} 저장`;
+}

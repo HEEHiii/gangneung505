@@ -142,6 +142,7 @@
       <div class="plan-actions">
         <button type="button" id="plan-build" class="btn-primary">투표 결과로 짜기</button>
         <button type="button" id="plan-share" class="btn-quiet" hidden>카톡으로 보내기</button>
+        <button type="button" id="plan-card" class="btn-quiet" hidden>한 장으로 저장</button>
       </div>
       <p class="field-note bad" id="plan-error"></p>
       <p class="field-note" id="plan-note"></p>
@@ -241,6 +242,23 @@
       </div>
     </section>
   </main>
+
+  <!-- 여행이 끝난 뒤 남는 한 장 (9:16) -->
+  <dialog id="card-view" class="dlg card-dlg">
+    <form method="dialog" class="dlg-box card-box" tabindex="-1">
+      <img id="card-img" alt="여행 동선 카드">
+      <label class="card-opt">
+        <input type="checkbox" id="card-names">
+        <span>장소 이름 보이기</span>
+      </label>
+      <p class="field-note" id="card-note"></p>
+      <div class="dlg-sep"></div>
+      <div class="photo-acts">
+        <button type="button" class="btn-primary" id="card-save">저장</button>
+      </div>
+      <button type="submit" class="btn-quiet">닫기</button>
+    </form>
+  </dialog>
 
   <dialog id="photo-view" class="dlg photo-dlg">
     <form method="dialog" class="dlg-box photo-box" tabindex="-1">

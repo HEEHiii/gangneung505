@@ -12,10 +12,11 @@
    아직 없는 것: 일정·정산 (2단계)
    ============================================================ */
 
-import { $, $$, esc, toast, fmtRange, won } from "./dom.js";
+import { $, $$, esc, toast, fmtRange, won, saveBlob, saveLabel } from "./dom.js";
 import { distanceKm, prettyKm, parsePos } from "./geo.js";
 import { KAKAO_JS_KEY, hasBackend, hasMap } from "./config.js";
 import { regionByCode, THEMES } from "./regions.js";
+import { pickPoints, layoutCard, renderCard, canDraw, totalKm } from "./card.js";
 import { loadKakao, kakaoReady, createMap } from "./kakaomap.js";
 import { searchByKeyword, searchByAddress, looksLikeAddress,
          seedSpots, resolveLink, findHub } from "./places.js";
@@ -266,6 +267,13 @@ function redrawAll() {
 /* ============================================================
    4. 탭
    ============================================================ */
+/* 여행이 끝났는가 — 사진 안내와 스토리 카드가 같이 봅니다.
+   두 곳이 각자 판단하면 언젠가 어긋납니다. */
+function tripEnded() {
+  return !!(room && room.end_date
+    && new Date(`${room.end_date}T23:59:59`) < new Date());
+}
+
 const TABS = ["stay", "food", "plan", "money", "photo"];
 
 /* ------------------------------------------------------------
@@ -564,6 +572,87 @@ function select(mapKey, id, fromCard) {
     if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
+
+/* ============================================================
+   여행이 끝난 뒤 남는 한 장
+
+   ★ 지도 타일을 안 씁니다 — 카카오 지도는 캔버스로 못 내보냅니다.
+     좌표만 받아 선과 점으로 그립니다 (card.js 주석 참고).
+   ============================================================ */
+let cardBlob = null;
+let cardUrl = "";
+
+function cardData() {
+  const points = pickPoints(state.itinerary, state.places, room);
+  const days = planDays().length || state.itinerary.length || 1;
+  const spots = new Set(points.filter((p) => p.nameSafe).map((p) => p.name)).size;
+  const km = totalKm(points);
+
+  const bits = [];
+  if (days > 1) bits.push(`${days - 1}박 ${days}일`);
+  if (spots) bits.push(`${spots}곳`);
+  if (km >= 1) bits.push(prettyKm(km));
+
+  return {
+    points,
+    title: (room && room.title) || "우리 여행",
+    sub: [room && room.region_name, fmtRange(room.start_date, room.end_date)]
+      .filter(Boolean).join(" · "),
+    foot: bits.join(" · "),
+  };
+}
+
+async function drawCard() {
+  const on = $("#card-names").checked;
+  try { localStorage.setItem(`trip.${slug}.cardNames`, on ? "1" : ""); } catch (_) {}
+
+  const data = cardData();
+  const L = layoutCard(data, { showNames: on });
+  cardBlob = await renderCard(L);
+
+  if (cardUrl) URL.revokeObjectURL(cardUrl);
+  cardUrl = URL.createObjectURL(cardBlob);
+
+  const img = $("#card-img");
+  img.style.aspectRatio = `${L.w} / ${L.h}`;   // 그림보다 자리를 먼저
+  img.src = cardUrl;
+  try { await img.decode(); } catch (_) {}
+
+  $("#card-note").textContent = data.points.length
+    ? "장소 이름은 꺼둔 채로 올리는 걸 권해요. 숙소 이름은 켜도 안 나옵니다."
+    : "일정에 좌표가 있는 곳이 없어서 길을 그릴 수 없었어요.";
+}
+
+async function openCard() {
+  try { $("#card-names").checked = !!localStorage.getItem(`trip.${slug}.cardNames`); }
+  catch (_) {}
+
+  $("#card-save").textContent = saveLabel("저장");
+
+  /* ★ 그림이 다 그려진 뒤에 창을 엽니다. 늦게 도착한 그림이 아래
+     내용을 밀어내는 일이 아예 생기지 않습니다 (사진 창에서 겪은 것). */
+  try {
+    await drawCard();
+  } catch (e) {
+    toast("한 장을 그리지 못했어요");
+    return;
+  }
+
+  const dlg = $("#card-view");
+  dlg.showModal();
+  dlg.scrollTop = 0;
+  const box = dlg.querySelector(".card-box");
+  if (box) box.focus({ preventScroll: true });
+}
+
+async function onSaveCard() {
+  if (!cardBlob) return;
+  const name = `${(room && room.title) || "여행"}-동선.png`;
+  const how = await saveBlob(cardBlob, name);
+  if (how === "failed") toast("저장하지 못했어요. 그림을 길게 눌러 저장해보세요");
+  else if (how === "downloaded") toast("저장했어요");
+}
+
 
 function keepSelection(mapKey, listSel, list) {
   const id = selectedId[mapKey];
@@ -932,8 +1021,7 @@ function renderGallery() {
      "우리가 지금 여기 있다"는 정보가 위험한 것이지, 다녀온 뒤
      사진은 추억입니다. 그래서 끝난 날짜를 보고 문구를 바꿉니다.
      안내를 늘 똑같이 띄우면 아무도 안 읽습니다. */
-  const ended = room && room.end_date
-    && new Date(`${room.end_date}T23:59:59`) < new Date();
+  const ended = tripEnded();
   $("#photo-warn").innerHTML = ended
     ? "링크를 가진 사람은 누구나 볼 수 있어요. "
       + "얼굴이 크게 나온 사진은 친구들에게 한 번 물어봐 주세요."
@@ -1154,29 +1242,8 @@ async function onSavePhoto() {
     return;
   }
 
-  /* 폰: 공유 시트 → "이미지 저장" 이 사진첩으로 넣어줍니다 */
-  try {
-    const file = new File([blob], name, { type: blob.type || "image/webp" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file] });
-      return;
-    }
-  } catch (e) {
-    if (e && e.name === "AbortError") return;      // 사용자가 취소
-    /* 공유가 안 되면 아래 내려받기로 */
-  }
-
-  /* 데스크톱: 내려받기 */
-  try {
-    const href = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = href;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(href), 1000);
-  } catch (_) {
+  /* 저장·공유 사슬은 dom.js 에 한 벌만 둡니다 (스토리 카드도 같이 씁니다) */
+  if (await saveBlob(blob, name) === "failed") {
     toast("저장하지 못했어요. 사진을 길게 눌러 저장해보세요");
   }
 }
@@ -1355,6 +1422,14 @@ function initPlan() {
 
   $("#plan-build").addEventListener("click", onBuildPlan);
   $("#plan-share").addEventListener("click", sharePlan);
+  $("#plan-card").addEventListener("click", openCard);
+  $("#card-names").addEventListener("change", drawCard);
+  $("#card-save").addEventListener("click", onSaveCard);
+  $("#card-view").addEventListener("close", () => {
+    /* 1080×1920 PNG 를 쌓아두면 폰에서 티가 납니다 */
+    if (cardUrl) { URL.revokeObjectURL(cardUrl); cardUrl = ""; }
+    cardBlob = null;
+  });
 
   $("#plan-days").addEventListener("click", async (ev) => {
     const btn = ev.target.closest("button[data-act]");
@@ -1465,6 +1540,12 @@ function renderPlan() {
 
   $("#plan-empty").hidden = has;
   $("#plan-share").hidden = !has;
+
+  /* ★ 여행이 끝난 뒤에만 보입니다.
+
+     여행 전에 동선을 공개하는 건 "언제 집이 비는지" 를 알리는
+     일입니다. 사진 탭이 큰 글씨로 말리는 것과 같은 이유입니다. */
+  $("#plan-card").hidden = !(has && tripEnded() && canDraw());
   $("#plan-build").textContent = has ? "투표 결과로 다시 짜기" : "투표 결과로 짜기";
 
   if (!has) { box.innerHTML = ""; return; }
