@@ -1170,3 +1170,15 @@ body{
   font-size: .85rem;
   white-space: nowrap;
 }
+
+
+/* ───────── 개인정보 처리방침 ───────── */
+.card h3 {
+  margin: 20px 0 8px;
+  font-size: 15px;
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.card h3:first-of-type { margin-top: 6px; }
+.card p + .how-list { margin-top: 10px; }
+.foot a { color: inherit; }

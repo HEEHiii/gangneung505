@@ -467,6 +467,42 @@ console.log("── 테마 고르기 탭 영역");
   ok(/깃허브/.test(bogus), `모르는 이름은 무시하고 기본값으로  (${bogus.slice(0, 20)}…)`);
 }
 
+/* ============================================================
+   개인정보 처리방침
+
+   ★ 링크만 걸고 페이지가 없으면 404 입니다. 법적으로 있어야 하는
+     문서라 "있는 척"이 제일 나쁩니다.
+   ============================================================ */
+{
+  console.log("── 개인정보 처리방침");
+  const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
+  const page = await ctx.newPage();
+  const bad = [];
+  page.on("pageerror", (e) => bad.push(String(e)));
+
+  await page.goto(`${BASE}/app/index.html`);
+  const href = await page.getAttribute('.foot a[href="privacy.html"]', "href");
+  eq(href, "privacy.html", "첫 화면 바닥에 링크가 있다");
+
+  const res = await page.goto(`${BASE}/app/privacy.html`);
+  eq(res.status(), 200, "★ 링크가 가리키는 페이지가 실제로 있다");
+
+  const text = await page.locator("main").innerText();
+  for (const must of ["카카오", "사진", "지우", "문의", "만 14세"]) {
+    ok(text.includes(must), `빠진 대목이 없다 — "${must}"`);
+  }
+
+  /* ★ 연락처를 안 채우고 올리면 "문의하세요" 라고 해놓고 문의할 곳이
+     없는 문서가 됩니다. 채울 때까지 눈에 띄게 해둡니다. */
+  const blank = text.includes("여기에 이메일 주소를 적어주세요");
+  if (blank) console.log("  주의  연락처가 아직 비어 있습니다 (공개 전에 채우세요)");
+
+  eq(await page.locator('.foot a[href="index.html"]').isVisible(), true,
+    "돌아가는 길이 있다");
+  eq(bad.length, 0, `콘솔 오류 없음${bad.length ? " — " + bad[0] : ""}`);
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");
