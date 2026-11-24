@@ -54,7 +54,11 @@
   KMap.prototype.getCenter = function () { return this._center; };
   KMap.prototype.panTo = function (ll) { this._center = ll; };
   KMap.prototype.setCenter = function (ll) { this._center = ll; };
-  KMap.prototype.setBounds = function (b) { this._bounds = b; };
+  /* ★ setBounds 는 "이 범위가 다 보이게" 이므로 확대가 풀립니다.
+     전에는 _bounds 만 적고 _level 을 그대로 뒀는데, 그러면
+     "카드를 눌러 확대한 것이 유지되는가" 같은 검사가 헛돕니다 —
+     되돌려놓고도 통과해버립니다. 진짜 지도처럼 멀어지게 합니다. */
+  KMap.prototype.setBounds = function (b) { this._bounds = b; this._level = 8; };
   KMap.prototype.relayout = function () { this._relayouts++; };
   KMap.prototype.getNode = function () { return this._el; };
 

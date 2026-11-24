@@ -503,6 +503,46 @@ console.log("── 테마 고르기 탭 영역");
   await ctx.close();
 }
 
+/* ============================================================
+   카톡 링크 미리보기
+
+   ★ og:image 가 상대 경로면 카톡이 못 읽어서 그림 없는 카드가
+     뜹니다. 그런데 브라우저로 열면 멀쩡해 보여서, 실제로
+     카톡에 보내보기 전까지는 모릅니다. 그래서 검사로 둡니다.
+
+   ★ 방 페이지 제목에 여행 이름이 들어가면 안 됩니다. 링크가
+     단톡방 밖으로 새면 "누가 어디 가는지" 가 미리보기만으로
+     드러납니다.
+   ============================================================ */
+{
+  console.log("── 링크 미리보기");
+  const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
+  const page = await ctx.newPage();
+
+  for (const [file, name] of [["index.html", "첫 화면"],
+                              ["room.html", "방"],
+                              ["privacy.html", "처리방침"]]) {
+    await page.goto(`${BASE}/app/${file}`);
+    const img = await page.getAttribute('meta[property="og:image"]', "content");
+    const title = await page.getAttribute('meta[property="og:title"]', "content");
+    ok(img && /^https:\/\//.test(img),
+      `${name} — og:image 가 전체 주소다  (${String(img).slice(0, 44)}…)`);
+    ok(title && title.length > 1, `${name} — 제목이 있다  (${title})`);
+  }
+
+  /* 그림 파일이 실제로 있는지 */
+  const res = await page.goto(`${BASE}/app/assets/brand/og.png`);
+  eq(res.status(), 200, "★ 미리보기 그림 파일이 실제로 있다");
+
+  await page.goto(`${BASE}/app/room.html`);
+  const roomTitle = await page.getAttribute('meta[property="og:title"]', "content");
+  const roomDesc = await page.getAttribute('meta[property="og:description"]', "content");
+  ok(!/강릉|여행 이름|\{/.test(`${roomTitle} ${roomDesc}`),
+    "★ 방 미리보기에 여행 이름이 안 들어간다");
+
+  await ctx.close();
+}
+
 await browser.close();
 
 console.log("");

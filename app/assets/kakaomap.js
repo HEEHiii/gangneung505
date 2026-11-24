@@ -98,7 +98,7 @@ function stubMap(elId, reason) {
     setLodgings: (list) => (list || []).filter((d) => d.lat != null).length,
     setSpots: noop, setPoints: noop,
     goTo: noop, select: noop, filter: noop,
-    fit: noop, fitPoints: noop, clearSelect: noop,
+    fit: noop, fitPoints: noop, clearSelect: noop, level: () => null,
     startPick: (cb) => { if (cb) cb(null); },   // 찍기를 즉시 포기 → 좌표 직접 입력으로
     cancelPick: noop, showPick: noop, refresh: noop,
   };
@@ -139,6 +139,10 @@ export function createMap(elId, opts = {}) {
   let spotOvs = [];
   let bounds = null;         // 숙소 전체 범위
   let pointBounds = null;    // 맛집 전체 범위
+
+  /* 사용자가 한 곳을 골라 들여다보는 중인가.
+     켜져 있으면 refresh() 가 전체 범위를 다시 씌우지 않습니다. */
+  let focused = false;
   let picking = null;
   let pickOv = null;
   let visible = { lodging: true, spot: true };
@@ -316,6 +320,7 @@ export function createMap(elId, opts = {}) {
     goTo(id) {
       const hit = markers[id];
       if (!hit) return;
+      focused = true;
       map.panTo(ll(hit.lat, hit.lng));
       if (map.getLevel() > 5) map.setLevel(5, { animate: true });
     },
@@ -330,6 +335,7 @@ export function createMap(elId, opts = {}) {
       const hit = markers[id];
       if (!hit) return;
       if (fly) {
+        focused = true;
         map.panTo(ll(hit.lat, hit.lng));
         if (map.getLevel() > 5) map.setLevel(5, { animate: true });
       }
@@ -344,10 +350,14 @@ export function createMap(elId, opts = {}) {
     },
 
     /* 전체 보기로 되돌리기 */
-    fit() { setBounds(bounds); },
-    fitPoints() { setBounds(pointBounds); },
+    /* 지금 확대 단계 — 테스트가 "확대가 유지되는가" 를 확인할 때 씁니다 */
+    level() { return map.getLevel(); },
+
+    fit() { focused = false; setBounds(bounds); },
+    fitPoints() { focused = false; setBounds(pointBounds); },
 
     clearSelect() {
+      focused = false;
       Object.values(markers).forEach((m) => {
         const inner = m.el && m.el.firstElementChild;
         if (inner) inner.classList.remove("sel");
@@ -387,6 +397,14 @@ export function createMap(elId, opts = {}) {
     refresh() {
       setTimeout(() => {
         map.relayout();
+
+        /* ★ 한 곳을 골라 들여다보고 있으면 범위를 다시 씌우지 않습니다.
+
+           relayout 은 탭이 보일 때마다 필요하지만, 뒤이어 setBounds 를
+           하면 "전체가 다 보이게" 가 되어 확대가 풀립니다. 카드를 눌러
+           확대해 둔 사람이 다른 탭에 갔다 오면 지도가 처음으로 돌아가
+           있었습니다. 되돌릴 이유가 없습니다 — 보던 데를 그대로 둡니다. */
+        if (focused) return;
         if (bounds || pointBounds) setBounds(bounds || pointBounds);
       }, 60);
     },

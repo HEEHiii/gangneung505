@@ -155,6 +155,7 @@ async function enter() {
   /* 테스트가 "폴링이 한 번 돈" 상황을 기다리지 않고 만들 수 있게.
      20초를 기다리는 테스트는 느리고, 느린 테스트는 안 돌리게 됩니다. */
   window.__refreshNow = async () => { await refresh(); redrawAll(); };
+  window.__maps = maps;                      // 테스트가 지도 상태를 보려고
 
   window.__roomReady = true;
 }

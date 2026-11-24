@@ -1476,6 +1476,77 @@ console.log("── 방장은 친구 것도 지울 수 있다");
   await ctx.close();
 }
 
+/* ============================================================
+   카드를 눌러 확대한 것이 유지되는가
+
+   ★ 사장님이 두 번 말씀하신 증상입니다. 카드를 누르면 확대는
+     되는데 금방 전체 지도로 되돌아갑니다.
+
+     되돌리는 길이 두 개 있습니다:
+       · 20초마다 도는 갱신(redrawAll)
+       · 탭을 나갔다 들어올 때의 refresh()  ← refresh 가 60ms 뒤에
+         setBounds 로 전체 범위를 다시 씌웁니다
+   ============================================================ */
+{
+  console.log("── 카드를 눌러 확대한 뒤");
+  const a = await fresh();
+  const url = await makeRoom(a.page);
+  await openRoom(a.page, url);
+  await enter(a.page);
+
+  const slug = await a.page.evaluate(() => {
+    const u = new URL(location.href);
+    return (u.searchParams.get("r") || "").toUpperCase();
+  });
+
+  /* 좌표가 있는 숙소 두 곳을 넣습니다 (하나면 확대해도 티가 안 납니다) */
+  await a.page.evaluate((slug) => {
+    const key = `trip.local.${slug}`;
+    const box = JSON.parse(localStorage.getItem(key));
+    box.places = box.places || [];
+    box.places.push(
+      { id: "lg-1", kind: "lodging", name: "경포대 숙소",
+        lat: 37.795, lng: 128.896, created_by: "me", created_at: new Date().toISOString() },
+      { id: "lg-2", kind: "lodging", name: "정동진 숙소",
+        lat: 37.690, lng: 129.034, created_by: "me", created_at: new Date().toISOString() },
+    );
+    localStorage.setItem(key, JSON.stringify(box));
+  }, slug);
+
+  await a.page.reload();
+  await a.page.waitForFunction(() => window.__roomReady === true, { timeout: 8000 });
+  await a.page.waitForTimeout(500);
+
+  const level = () => a.page.evaluate(
+    () => (window.__maps && window.__maps.stay ? window.__maps.stay.level() : null));
+
+  await a.page.locator("#lodging-list .card .card-name").first().click();
+  await a.page.waitForTimeout(300);
+  const zoomed = await level();
+  ok(zoomed !== null && zoomed <= 5, `카드를 누르면 확대된다  (단계 ${zoomed})`);
+
+  /* ① 20초마다 도는 갱신이 돌아도 */
+  await a.page.evaluate(() => window.__refreshNow());
+  await a.page.waitForTimeout(300);
+  eq(await level(), zoomed, "★ 갱신이 돌아도 확대가 풀리지 않는다");
+
+  /* ② 탭을 나갔다 들어와도 */
+  await a.page.click('#tabs a[data-tab="food"]');
+  await a.page.waitForTimeout(200);
+  await a.page.click('#tabs a[data-tab="stay"]');
+  await a.page.waitForTimeout(400);
+  eq(await level(), zoomed, "★ 탭을 나갔다 와도 확대가 풀리지 않는다");
+
+  /* ③ 선택 강조도 살아 있어야 합니다 */
+  eq(await a.page.locator("#lodging-list .card.sel").count(), 1,
+    "카드 강조가 남아 있다");
+  ok(await a.page.evaluate(() => !!document.querySelector(".pin-lodging.sel, .sel .pin-lodging, .sel")),
+    "지도 핀 강조도 남아 있다");
+
+  eq(a.errors.length, 0, `콘솔 오류 없음${a.errors.length ? " — " + a.errors[0] : ""}`);
+  await a.ctx.close();
+}
+
 await browser.close();
 
 console.log("");
