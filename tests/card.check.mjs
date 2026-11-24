@@ -8,7 +8,7 @@
      숫자만 내놓고 여기서 잽니다.
    ============================================================ */
 
-import { pickPoints, layoutCard, CARD } from "../app/assets/card.js";
+import { pickPoints, layoutCard, footsteps, CARD } from "../app/assets/card.js";
 
 let fails = 0;
 const ok = (cond, what) => {
@@ -134,6 +134,58 @@ const L = (points, opts) => layoutCard({ points, title: "겨울 강릉" }, opts)
   eq(r.stops, [], "점이 없으면 빈 채로");
   eq(r.path, [], "점이 없으면 선도 없다");
   ok(r.title === "겨울 강릉", "점이 없어도 제목은 남는다");
+}
+
+
+/* ============================================================
+   2-2. 발자취 — 선 자리에 발자국
+
+   ★ 발자국이 길에서 벗어나면 "우리가 다닌 길" 이 아니게 됩니다.
+     눈으로는 그럴듯해 보여도 그렇습니다.
+   ============================================================ */
+console.log("── 발자취");
+{
+  eq(footsteps([]), [], "점이 없으면 발자국도 없다");
+  eq(footsteps([{ x: 10, y: 10 }]), [], "점이 하나면 발자국도 없다");
+}
+{
+  const path = [{ x: 100, y: 100 }, { x: 600, y: 100 }];   // 가로 500
+  const st = footsteps(path);
+  ok(st.length >= 8 && st.length <= 11, `간격대로 찍힌다  (${st.length}개)`);
+
+  ok(st.every((p) => Math.abs(p.y - 100) < 0.001),
+    "★ 발자국이 길 위에 있다 (옆으로 새지 않는다)");
+  ok(st.every((p) => Math.abs(p.angle) < 0.001),
+    "★ 발자국이 가는 방향을 본다");
+
+  const gaps = st.slice(1).map((p, i) => p.x - st[i].x);
+  ok(gaps.every((g) => Math.abs(g - gaps[0]) < 0.001),
+    `간격이 고르다  (${gaps[0]}px)`);
+  ok(st[0].x > 100, "출발점 위에 겹쳐 찍지 않는다");
+}
+{
+  /* 꺾이는 길 — 꺾인 뒤에도 길 위에 있어야 합니다 */
+  const path = [{ x: 100, y: 100 }, { x: 400, y: 100 }, { x: 400, y: 500 }];
+  const st = footsteps(path);
+  const onPath = st.every((p) =>
+    (Math.abs(p.y - 100) < 0.5 && p.x >= 99 && p.x <= 401) ||
+    (Math.abs(p.x - 400) < 0.5 && p.y >= 99 && p.y <= 501));
+  ok(onPath, "★ 꺾인 뒤에도 발자국이 길 위에 있다");
+
+  const turned = st.filter((p) => Math.abs(p.angle - Math.PI / 2) < 0.001);
+  ok(turned.length > 0, "꺾인 구간에서는 방향도 꺾인다");
+}
+{
+  /* 아주 긴 길에서도 무한정 찍지 않습니다 */
+  const st = footsteps([{ x: 0, y: 0 }, { x: 1000000, y: 0 }]);
+  ok(st.length <= 400, `아주 멀어도 상한이 있다  (${st.length}개)`);
+}
+{
+  /* layout 이 발자국을 함께 내놓습니다 */
+  const r = L([경포, 정동진]);
+  ok(r.steps.length > 0, "layout 에 발자국이 들어 있다");
+  const r1 = L([경포]);
+  eq(r1.steps, [], "점이 하나면 발자국이 없다");
 }
 
 

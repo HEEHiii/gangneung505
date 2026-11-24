@@ -210,10 +210,13 @@ export function layoutCard(data = {}, opts = {}) {
     }
   }
 
+  const path = stops.length > 1 ? stops.map((s) => ({ x: s.x, y: s.y })) : [];
+
   return {
     w, h, area,
     stops,
-    path: stops.length > 1 ? stops.map((s) => ({ x: s.x, y: s.y })) : [],
+    path,
+    steps: footsteps(path),
     /* ★ 기본은 이름을 넣지 않습니다. 켜는 건 올리는 사람 몫입니다. */
     labels: showNames ? placeLabels(stops, { x: AREA.x, w: w - AREA.x * 2 }) : [],
     showNames,
@@ -223,6 +226,46 @@ export function layoutCard(data = {}, opts = {}) {
     brand: String(data.brand || "친구들과 여행계획"),
   };
 }
+
+/* ------------------------------------------------------------
+   발자취 — 선 자리에 발자국을 늘어놓습니다
+
+   ★ 걸음걸이를 흉내 내지 않습니다. 좌우로 번갈아 벌리고 바깥으로
+     틀어보니, 작게 줄이면 그냥 얼룩으로 보이고 선만 눈에 남았습니다.
+     선이 가던 자리에 발자국을 그대로 얹는 쪽이 또렷합니다.
+
+   ★ 자리 계산은 여기(순수)에 둡니다. 그리는 쪽에서 하면 눈으로
+     보기 전까지 틀린 줄 모릅니다.
+   ------------------------------------------------------------ */
+const STEP = {
+  gap: 52,      // 발자국 간격
+  len: 30,      // 발자국 길이
+  wide: 14,     // 발자국 폭
+  max: 400,     // 아주 긴 여행에서도 이보다 많이는 안 찍습니다
+};
+
+export function footsteps(path) {
+  const p = Array.isArray(path) ? path : [];
+  if (p.length < 2) return [];
+
+  const out = [];
+  let carry = STEP.gap / 2;        // 출발점 바로 위에 겹치지 않게
+
+  for (let i = 1; i < p.length && out.length < STEP.max; i++) {
+    const a = p[i - 1], b = p[i];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (!(len > 0)) continue;
+
+    const angle = Math.atan2(dy, dx);
+    for (let t = carry; t <= len && out.length < STEP.max; t += STEP.gap) {
+      out.push({ x: a.x + (dx / len) * t, y: a.y + (dy / len) * t, angle });
+    }
+    carry = STEP.gap - ((len - carry) % STEP.gap);   // 남은 거리를 다음 구간으로
+  }
+  return out;
+}
+
 
 /* ------------------------------------------------------------
    이름표 자리 잡기
@@ -317,15 +360,8 @@ export async function renderCard(L, colors = COLORS) {
     ctx.globalAlpha = 1;
   }
 
-  /* 동선 */
-  if (L.path.length > 1) {
-    ctx.globalAlpha = 0.95;
-    ctx.lineWidth = 9;
-    ctx.beginPath();
-    L.path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
+  /* 발자취 — 선을 긋지 않습니다. 발자국이 곧 선입니다. */
+  for (const st of L.steps) drawFoot(ctx, st);
 
   /* 들른 곳.
 
@@ -405,6 +441,24 @@ function makeCanvas(w, h) {
 function toBlob(canvas) {
   if (canvas.convertToBlob) return canvas.convertToBlob({ type: "image/png" });
   return new Promise((res) => canvas.toBlob(res, "image/png"));
+}
+
+/* 발자국 하나 — 앞꿈치와 뒤꿈치 두 덩이면 작게도 발로 읽힙니다 */
+function drawFoot(ctx, st) {
+  const L = STEP.len, W = STEP.wide;
+  ctx.save();
+  ctx.translate(st.x, st.y);
+  ctx.rotate(st.angle);
+
+  ctx.beginPath();
+  ctx.ellipse(L * 0.16, 0, L * 0.36, W * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(-L * 0.38, 0, L * 0.18, W * 0.33, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 function drawPin(ctx, x, y, colors) {
