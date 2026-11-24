@@ -28,10 +28,20 @@
   --pin-fill:#ffffff;
   --pin-grey:#8a8f96;
 
-  --shadow-sm:var(--shadow-sm);
-  --shadow-md:var(--shadow-md);
-  --shadow-lg:var(--shadow-lg);
-  --shadow-xl:var(--shadow-xl);
+  /* ★ 전에는 --shadow-sm:var(--shadow-sm) 처럼 자기 자신을 가리켰습니다.
+     CSS 에서 그건 "값 없음"이라, box-shadow:var(--shadow-lg) 가 전부
+     풀리지 않아 카드가 하나도 안 떠 있었습니다. 눈에는 "원래 평평한
+     디자인" 으로 보여서 아무도 버그라고 생각하지 않았습니다. */
+  /* 눌린 탭처럼 "떠오른" 면. 밝은 화면에서는 흰 종이지만, 어두운
+     화면에서는 흰색이 아니라 바탕보다 밝은 회색이어야 떠 보입니다.
+     겨울에서 --surface 를 그냥 쓰면 바탕보다 어두워서, 눌린 탭이
+     떠오르는 대신 파인 것처럼 보였습니다. */
+  --raised:var(--surface);
+
+  --shadow-sm:0 1px 2px rgba(42,36,32,.06);
+  --shadow-md:0 2px 8px rgba(42,36,32,.08);
+  --shadow-lg:0 6px 18px rgba(42,36,32,.10);
+  --shadow-xl:0 14px 36px rgba(42,36,32,.16);
 }
 
 /* ============================================================
@@ -42,49 +52,68 @@
    tests/theme.spec.mjs 가 여덟 벌 전부 대비를 재서 막아줍니다.
    ============================================================ */
 
+/* ★ 2026-11 디자인 정리
+
+   네 계절이 바탕·선·글자까지 제각각이었습니다. 손볼 곳이 네 배인데
+   얻는 건 적고, 무엇보다 아이콘·카톡 미리보기·발자취 카드가 전부
+   주황인데 화면만 갈색이라 같은 서비스로 안 보였습니다.
+
+   그래서 바탕·선·글자는 거의 같게 두고 강조색으로 계절을 냅니다.
+   "거의" 인 이유는, 고른 계절이 화면에 전혀 안 보이면 고르는 의미가
+   없기 때문입니다. 바탕에 그 계절 기미를 아주 옅게 남깁니다
+   (tests/theme.spec.mjs 가 네 계절 배경이 서로 다른지 잽니다).
+   ───────────────────────────────────────────────────────── */
+
 /* ───────── 여름 (기본) ───────── */
 :root,
 :root[data-theme="summer"]{
   color-scheme:light;
-  --bg:#f7fcfd; --surface:#ffffff; --surface-2:#e8f4f9;
-  --line:#d8e9f0; --line-strong:#b3d2df;
-  --text:#1b2a33; --muted:#5b7280; --faint:#a7bcc7;
-  --accent:#26718c; --accent-soft:#e2f1f7; --on-dark:#ffffff;
-  --danger:#b3382a; --ok:#1a7f4b;
+  --bg:#fbfcfd; --surface:#ffffff; --surface-2:#eef2f5;
+  --line:#e3e8ec; --line-strong:#c9d2d8;
+  --text:#23292e; --muted:#616a71; --faint:#a3abb1;
+  --accent:#1f6f8b; --accent-soft:#e6f1f6; --on-dark:#ffffff;
+  --danger:#a12b1a; --ok:#1a7f4b;
 }
 
 /* ───────── 봄 ───────── */
 :root[data-theme="spring"]{
   color-scheme:light;
-  --bg:#fffbfc; --surface:#ffffff; --surface-2:#fbe9ee;
-  --line:#f5dde4; --line-strong:#e6bfca;
-  --text:#32232a; --muted:#7d6069; --faint:#c4a9b2;
-  --accent:#b05570; --accent-soft:#fcecf0; --on-dark:#ffffff;
-  --danger:#b3382a; --ok:#1a7f4b;
+  --bg:#fdfbfc; --surface:#ffffff; --surface-2:#f6eff2;
+  --line:#ebe1e5; --line-strong:#d6c4cb;
+  --text:#2b2328; --muted:#6a5c62; --faint:#a9a0a4;
+  --accent:#b8406a; --accent-soft:#fbeaf0; --on-dark:#ffffff;
+  --danger:#a12b1a; --ok:#1a7f4b;
 }
 
 /* ───────── 가을 ───────── */
 :root[data-theme="autumn"]{
   color-scheme:light;
-  --bg:#fffdf8; --surface:#ffffff; --surface-2:#f9ecdb;
-  --line:#f0e1cb; --line-strong:#ddc5a4;
-  --text:#332619; --muted:#7a6650; --faint:#c0ac95;
-  --accent:#975e26; --accent-soft:#fbefe0; --on-dark:#ffffff;
-  --danger:#b3382a; --ok:#1a7f4b;
+  --bg:#fdfbf7; --surface:#ffffff; --surface-2:#f6f1e8;
+  --line:#e8dfd2; --line-strong:#d4c7b4;
+  --text:#2a2420; --muted:#6b625b; --faint:#a9a099;
+  --accent:#c2491f; --accent-soft:#fbe6dc; --on-dark:#ffffff;
+  --danger:#a12b1a; --ok:#1a7f4b;
 }
 
 /* ───────── 겨울 ─────────
    ★ 겨울만 기기 설정과 무관하게 항상 어둡습니다.
      계절이 색뿐 아니라 분위기까지 정하게 한 선택입니다 — 겨울밤 느낌.
-     덕분에 고를 때 보이는 색 견본과 실제 화면이 늘 일치합니다.
-     나머지 세 계절은 아래 media query 로 기기 설정을 따라갑니다. */
+     덕분에 고를 때 보이는 색 견본과 실제 화면이 늘 일치합니다. */
 :root[data-theme="winter"]{
   color-scheme:dark;
-  --bg:#151b21; --surface:#1c242b; --surface-2:#232d36;
-  --line:#2d3942; --line-strong:#41505c;
-  --text:#e7eef4; --muted:#9fafbb; --faint:#5f6e79;
-  --accent:#9dc2e0; --accent-soft:#1e2d3a; --on-dark:#151b21;
+  --bg:#1a1f26; --surface:#242b34; --surface-2:#2b333d;
+  --line:#323c48; --line-strong:#46525f;
+  --text:#eef2f6; --muted:#9aa7b4; --faint:#67727d;
+  --accent:#7fb0e3; --accent-soft:#223243; --on-dark:#141a21;
+  --raised:#3a4553;
   --danger:#ff9a8b; --ok:#7fd9ab;
+
+  /* 어두운 바탕에서는 그림자가 안 보입니다. 더 진하게 깔아야
+     카드가 떠 보입니다. */
+  --shadow-sm:0 1px 2px rgba(0,0,0,.30);
+  --shadow-md:0 2px 10px rgba(0,0,0,.36);
+  --shadow-lg:0 8px 22px rgba(0,0,0,.44);
+  --shadow-xl:0 16px 40px rgba(0,0,0,.52);
 }
 
 /* ───────── 왜 기기 설정(prefers-color-scheme)을 안 따르는가 ─────────
@@ -176,18 +205,31 @@ button,input{font:inherit;color:inherit}
 .brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .brand strong{font-size:17px;letter-spacing:-0.02em}
 .brand span{font-size:12px;color:var(--muted)}
+/* ★ 밑줄 대신 알약.
+
+   밑줄 탭은 지금 어느 탭에 있는지는 알려주지만 "눌리는 것" 으로는
+   잘 안 읽힙니다. 폰에서는 더 그렇습니다. 알약은 눌린 칸이 종이
+   위로 떠올라서 손가락이 어디를 짚었는지 바로 보입니다. */
 .tabs{
-  max-width:var(--maxw);margin:0 auto;padding:0 var(--gutter);
-  display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;
+  width:calc(100% - var(--gutter) * 2);
+  max-width:calc(var(--maxw) - var(--gutter) * 2);
+  margin:0 auto;padding:3px;
+  display:flex;gap:3px;
+  background:var(--surface-2);border-radius:12px;
+  overflow-x:auto;scrollbar-width:none;
 }
 .tabs::-webkit-scrollbar{display:none}
 .tabs a{
-  flex:0 0 auto;padding:10px 14px;font-size:14px;font-weight:500;
-  color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;
-  transition:color .15s,border-color .15s;white-space:nowrap;
+  flex:1 1 0;min-width:0;padding:9px 6px;
+  font-size:13px;font-weight:500;text-align:center;
+  color:var(--muted);text-decoration:none;border-radius:9px;
+  transition:color .15s,background .15s;white-space:nowrap;
 }
 .tabs a:hover{color:var(--text)}
-.tabs a.on{color:var(--text);font-weight:600;border-bottom-color:var(--text)}
+.tabs a.on{
+  color:var(--text);font-weight:700;
+  background:var(--raised);box-shadow:var(--shadow-sm);
+}
 
 /* ───────── 레이아웃 ───────── */
 main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
@@ -247,15 +289,21 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 /* ───────── 카드 ───────── */
 .cards{display:flex;flex-direction:column;gap:10px}
 .card{
-  border:1px solid var(--line);border-radius:var(--r);
-  padding:14px 16px;background:var(--bg);
-  cursor:pointer;transition:border-color .15s,background .15s;
+  border:1px solid var(--line);border-radius:14px;
+  padding:14px 16px;background:var(--surface);
+  box-shadow:var(--shadow-sm);
+  cursor:pointer;
+  transition:border-color .15s,background .15s,box-shadow .15s;
 }
-.card:hover{border-color:var(--line-strong)}
-.card.sel{border-color:var(--accent);background:var(--accent-soft)}
+.card:hover{border-color:var(--line-strong);box-shadow:var(--shadow-md)}
+/* 고른 카드는 테두리를 두껍게 — 배경까지 바꾸면 글씨 대비가 흔들립니다 */
+.card.sel{
+  border-color:var(--accent);border-width:2px;padding:13px 15px;
+  box-shadow:var(--shadow-md);
+}
 .card-top{display:flex;align-items:flex-start;gap:10px}
 .card-no{
-  flex:0 0 22px;height:22px;border-radius:50%;
+  flex:0 0 24px;height:24px;border-radius:8px;
   background:var(--accent);color:var(--on-dark);
   font-size:11px;font-weight:700;
   display:flex;align-items:center;justify-content:center;margin-top:2px;
@@ -642,11 +690,11 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 
 /* 각 계절의 느낌을 작은 색 띠로 보여줍니다 */
 /* 그라데이션 없이 — 연한 바탕에 진한 색 띠를 단색으로 얹습니다 */
-.swatch-spring{background:#fbe4ea; box-shadow:inset 0 -9px 0 #b05570}
-.swatch-summer{background:#dff0f7; box-shadow:inset 0 -9px 0 #2d7f9d}
-.swatch-autumn{background:#f9ead6; box-shadow:inset 0 -9px 0 #a8692e}
+.swatch-spring{background:#f6eff2; box-shadow:inset 0 -9px 0 #b8406a}
+.swatch-summer{background:#eef2f5; box-shadow:inset 0 -9px 0 #1f6f8b}
+.swatch-autumn{background:#f6f1e8; box-shadow:inset 0 -9px 0 #c2491f}
 /* 겨울은 늘 어두우므로 견본도 어둡게 — 고를 때와 실제가 같아야 합니다 */
-.swatch-winter{background:#232d36; box-shadow:inset 0 -9px 0 #9dc2e0}
+.swatch-winter{background:#2b333d; box-shadow:inset 0 -9px 0 #7fb0e3}
 
 
 /* ============================================================
@@ -860,6 +908,13 @@ body{
       color-mix(in srgb, var(--line-strong) 38%, transparent) 27px 28px),
     var(--bg);
 }
+
+/* ★ 겨울은 줄을 걷습니다.
+   밝은 종이 위에서는 노트처럼 읽히는데, 어두운 바탕에서는 화면이
+   잘못 그려진 줄무늬로 보입니다. 같은 선이 분위기에 따라 정반대로
+   읽힙니다. */
+:root[data-theme="winter"] body,
+:root[data-theme="winter"] #gate{ background:var(--bg); }
 
 /* 첫 화면은 종이 위에 그냥 적은 느낌으로 */
 .hero{
@@ -1205,3 +1260,25 @@ body{
   cursor: pointer;
 }
 .card-opt input[type="checkbox"] { width: auto; margin: 0; }
+
+
+/* ───────── 투표 막대 ─────────
+
+   ★ 숫자만 세면 1등이 몇 표 차이인지 안 보입니다. "3표" 와 "1표" 가
+     나란히 있어도 눈에는 비슷해 보입니다. 막대가 그걸 말해줍니다.
+
+   폭은 1등을 100% 로 두고 견줍니다. 전체 인원으로 나누면 아무도
+   과반을 못 넘긴 흔한 경우에 막대가 전부 짧아서 또 안 보입니다.
+   ───────────────────────────────────────────────────────── */
+.vote-bar{
+  height:6px;border-radius:99px;background:var(--surface-2);
+  margin-top:9px;overflow:hidden;
+}
+.vote-bar > span{
+  display:block;height:100%;border-radius:99px;
+  background:color-mix(in srgb, var(--accent) 45%, var(--surface-2));
+  transition:width .25s;
+}
+.card.sel .vote-bar > span,
+.vote-bar.top > span{background:var(--accent)}
+.vote-bar.none{background:var(--surface-2)}

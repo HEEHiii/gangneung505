@@ -429,6 +429,7 @@ function renderLodgings() {
             ${canDelete(d.mine) ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
             <span class="vote-count" data-count="${esc(d.id)}"><strong>0</strong>표</span>
           </div>
+          <div class="vote-bar none" data-bar="${esc(d.id)}" aria-hidden="true"><span style="width:0"></span></div>
           ${commentsHtml(d.id)}
         </div>
       </div>
@@ -498,6 +499,7 @@ function renderFood() {
               ${canDelete(d.mine) ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
               <span class="vote-count" data-count="${esc(d.id)}"><strong>0</strong>표</span>
             </div>
+              <div class="vote-bar none" data-bar="${esc(d.id)}" aria-hidden="true"><span style="width:0"></span></div>
             ${commentsHtml(d.id)}
           </div>
         </div>
@@ -664,10 +666,25 @@ function keepSelection(mapKey, listSel, list) {
 }
 
 function paintVotes() {
+  /* ★ 막대 폭은 1등을 100% 로 두고 견줍니다.
+
+     전체 인원으로 나누면, 네 명 중 둘만 투표한 흔한 경우에 막대가
+     전부 짧아서 또 아무것도 안 보입니다. 알고 싶은 건 "몇 명이
+     투표했나" 가 아니라 "1등과 얼마나 차이나나" 입니다. */
+  const top = Math.max(0, ...state.places.map((d) => state.counts[d.id] || 0));
+
   state.places.forEach((d) => {
     const n = state.counts[d.id] || 0;
     const el = $(`[data-count="${CSS.escape(d.id)}"]`);
     if (el) el.innerHTML = `<strong>${n}</strong>표`;
+
+    const bar = $(`[data-bar="${CSS.escape(d.id)}"]`);
+    if (bar) {
+      bar.classList.toggle("none", n === 0);
+      bar.classList.toggle("top", n > 0 && n === top);
+      const fill = bar.firstElementChild;
+      if (fill) fill.style.width = top > 0 ? `${Math.round((n / top) * 100)}%` : "0";
+    }
 
     const btn = $(`[data-vote="${CSS.escape(d.id)}"]`);
     if (btn) {
