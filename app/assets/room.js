@@ -1562,7 +1562,7 @@ function renderPlan() {
 
      여행 전에 동선을 공개하는 건 "언제 집이 비는지" 를 알리는
      일입니다. 사진 탭이 큰 글씨로 말리는 것과 같은 이유입니다. */
-  $("#plan-card").hidden = !(has && tripEnded() && canDraw());
+  $("#card-promo").hidden = !(has && tripEnded() && canDraw());
   $("#plan-build").textContent = has ? "투표 결과로 다시 짜기" : "투표 결과로 짜기";
 
   if (!has) { box.innerHTML = ""; return; }
@@ -1575,11 +1575,12 @@ function renderPlan() {
 
     return `
       <div class="plan-day" data-d="${d.day_index}">
-        <h3>${esc(label)} <small>장소 ${spots}곳</small></h3>
+        <h3>${esc(label)} <small>${spots}곳</small></h3>
         <ul class="plan-slots">
           ${slots.length ? slots.map((x, i) => `
             <li data-i="${i}">
               <span class="plan-time">${esc(x.time || "")}</span>
+              <span class="plan-dot" aria-hidden="true"></span>
               <span class="plan-what">
                 <span class="plan-title">${esc(x.title || "")}</span>
                 ${x.note ? `<span class="plan-note">${esc(x.note)}</span>` : ""}

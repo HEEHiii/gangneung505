@@ -1074,36 +1074,72 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 .plan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 
 .plan-day{
-  border:1px solid var(--line);border-radius:var(--r);
-  background:var(--surface);padding:14px 15px;margin-bottom:12px;
+  border:1px solid var(--line);border-radius:14px;
+  background:var(--surface);box-shadow:var(--shadow-sm);
+  padding:0;margin-bottom:10px;overflow:hidden;
 }
 .plan-day h3{
-  margin:0 0 10px;font-size:15px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  margin:0;padding:12px 14px 9px;
+  border-bottom:1px solid var(--line);
+  font-family:"Gaegu","Gowun Dodum",system-ui,sans-serif;
+  font-size:21px;font-weight:700;letter-spacing:0;
+  display:flex;align-items:baseline;justify-content:space-between;gap:8px;
 }
-.plan-day h3 small{font-size:12px;color:var(--muted);font-weight:400}
+.plan-day h3 small{
+  font-family:"Gowun Dodum",system-ui,sans-serif;
+  font-size:12px;color:var(--muted);font-weight:400;
+}
+.plan-slots{padding:10px 14px 12px}
 
 .plan-slots{list-style:none;margin:0;padding:0}
+/* ★ 시간선 — 칸마다 선을 긋는 대신 점을 잇습니다.
+   줄마다 가로선을 그으면 표처럼 보이고, 여행은 표가 아니라
+   "이어지는 것" 입니다. */
 .plan-slots li{
-  display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:start;
-  padding:9px 0;border-top:1px solid var(--line);
+  display:grid;grid-template-columns:48px 12px 1fr auto;gap:10px;align-items:start;
+  padding:0 0 13px;border-top:0;
 }
-.plan-slots li:first-child{border-top:0}
+.plan-slots li:last-child{padding-bottom:0}
+
+.plan-dot{
+  position:relative;width:12px;height:100%;
+  display:flex;justify-content:center;
+}
+.plan-dot::before{
+  content:"";width:9px;height:9px;border-radius:99px;
+  background:var(--line-strong);margin-top:5px;flex:0 0 auto;
+}
+/* 하루의 시작은 또렷하게, 끝(숙소)은 속 빈 테로 */
+.plan-slots li:first-child .plan-dot::before{background:var(--accent)}
+.plan-slots li:last-child .plan-dot::before{
+  background:var(--surface);border:2px solid var(--accent);
+}
+/* 점끼리 잇는 선 — 마지막 칸 아래로는 안 내려갑니다 */
+.plan-slots li:not(:last-child) .plan-dot::after{
+  content:"";position:absolute;left:50%;top:16px;bottom:-13px;
+  width:2px;background:var(--line);transform:translateX(-50%);
+}
 .plan-time{
-  font-variant-numeric:tabular-nums;font-weight:600;font-size:14px;
-  color:var(--accent);padding-top:1px;
+  font-variant-numeric:tabular-nums;font-weight:700;font-size:13px;
+  color:var(--muted);padding-top:2px;
 }
-.plan-what{min-width:0}
-.plan-title{font-size:14px;font-weight:600;line-height:1.4}
-.plan-note{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.5}
-.plan-drop{
-  border:0;background:transparent;color:var(--muted);cursor:pointer;
-  font-size:17px;line-height:1;padding:2px 4px;
-}
-.plan-drop:hover{color:var(--danger)}
-.plan-move{display:flex;flex-direction:column;gap:2px}
+.plan-slots li:first-child .plan-time{color:var(--accent)}
+/* ★ 제목과 메모는 각각 한 줄입니다.
+   둘 다 <span> 이라 그냥 두면 "강릉역 도착 도착 시간에 맞춰
+   고치세요" 처럼 한 줄로 이어붙습니다. */
+.plan-what{min-width:0;display:flex;flex-direction:column;gap:2px}
+.plan-title{font-size:15px;font-weight:700;line-height:1.35}
+.plan-note{font-size:12px;color:var(--muted);line-height:1.5}
+.plan-move .plan-drop{font-size:14px}
+.plan-move .plan-drop:hover{color:var(--danger);border-color:var(--danger)}
+/* ★ 세로로 쌓으면 버튼 세 개가 줄 높이를 정하게 됩니다.
+   일정에서 눈이 가야 할 것은 시간과 장소이지 고치기 버튼이
+   아닙니다. 가로로 눕히고 옅게 둡니다. */
+.plan-move{display:flex;flex-direction:row;gap:3px;align-items:flex-start;padding-top:1px}
 .plan-move button{
-  border:1px solid var(--line-strong);background:var(--bg);color:var(--muted);
-  border-radius:5px;cursor:pointer;font-size:11px;line-height:1;padding:3px 5px;
+  border:1px solid var(--line);background:transparent;color:var(--faint);
+  border-radius:7px;cursor:pointer;font-size:10px;line-height:1;
+  width:24px;height:24px;display:flex;align-items:center;justify-content:center;
 }
 .plan-move button:hover:not(:disabled){color:var(--text);border-color:var(--text)}
 .plan-move button:disabled{opacity:.3;cursor:default}
@@ -1287,3 +1323,28 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 .card.sel .vote-bar > span,
 .vote-bar.top > span{background:var(--accent)}
 .vote-bar.none{background:var(--surface-2)}
+
+
+/* ───────── "다닌 길을 한 장으로" 띠 ─────────
+
+   ★ 이 띠만 브랜드 그라데이션을 씁니다. 화면의 다른 주황은 전부
+     단색 --accent 이고, 여기만 아이콘·카톡 미리보기·발자취 카드와
+     같은 노을을 깔아서 "저 그림이 여기서 나온다" 를 말합니다.
+   ───────────────────────────────────────────────────────── */
+.card-promo{
+  display:flex;align-items:center;gap:11px;
+  margin-bottom:11px;padding:12px 13px;
+  border-radius:13px;
+  background:linear-gradient(104deg,#ffb84d,#f05848);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(240,88,72,.26);
+}
+.card-promo-text{flex:1 1 0;min-width:0}
+.card-promo-text strong{display:block;font-size:14px;font-weight:700}
+.card-promo-text span{font-size:12px;color:rgba(255,255,255,.9)}
+.card-promo button{
+  flex:0 0 auto;font:inherit;font-size:13px;font-weight:700;
+  color:#c2491f;background:#fff;border:0;border-radius:10px;
+  padding:9px 12px;cursor:pointer;
+}
+.card-promo button:focus-visible{outline:2px solid #fff;outline-offset:2px}
