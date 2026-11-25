@@ -161,14 +161,12 @@
     <button type="button" class="btn-quiet" id="signout" hidden>로그아웃</button>
   </section>
 
-  <!-- ───────── 어느 탭을 쓰는지 (방장에게만) ───────── -->
-  <section class="card" id="usage" hidden>
-    <h2 class="card-title">어느 탭을 쓰나요?</h2>
-    <ul class="usage-list" id="usage-list"></ul>
-    <p class="field-note" id="usage-note"></p>
-    <button type="button" class="btn-quiet" id="sweep">지운 사진 파일 정리</button>
-    <p class="field-note" id="sweep-note"></p>
-  </section>
+  <!-- ───────── 관리 (명단에 있는 계정에만 보입니다) ─────────
+       통계는 admin.html 로 옮겼습니다. 방을 만들러 온 사람에게는
+       쓸모없는 칸이었고, 볼 사람에게는 너무 좁았습니다. -->
+  <p class="admin-link" id="admin-link" hidden>
+    <a href="admin.html">통계 보기 →</a>
+  </p>
 
   <!-- ───────── 어떻게 쓰는지 ───────── -->
   <section class="card how">

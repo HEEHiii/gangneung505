@@ -481,8 +481,12 @@ console.log("── 테마 고르기 탭 영역");
   console.log("── 탭 사용 칸");
   const { ctx, page, errors } = await open();
 
-  eq(await page.locator("#usage").isVisible(), false,
-    "★ 설정이 없으면 통계 칸이 아예 안 보인다");
+  /* 통계는 admin.html 로 옮겼습니다. 첫 화면에 남은 것은 "문" 뿐이고,
+     그 문도 명단에 있는 계정에만 보입니다. */
+  eq(await page.locator("#admin-link").isVisible(), false,
+    "★ 설정이 없으면 관리 문이 아예 안 보인다");
+  eq(await page.locator("#usage").count(), 0,
+    "   첫 화면에 통계 칸이 더는 없다");
   eq(errors.length, 0,
     `통계 때문에 콘솔 오류가 나지 않는다${errors.length ? " — " + errors[0] : ""}`);
 
@@ -492,6 +496,59 @@ console.log("── 테마 고르기 탭 영역");
     "★ 로그인하지 않았으면 로그아웃 버튼이 안 보인다");
 
   await ctx.close();
+}
+
+/* ============================================================
+   관리 화면 (admin.html)
+
+   ★ 여기서 지켜야 할 성질은 "화면을 숨겼는가" 가 아닙니다.
+     주소를 치면 누구나 열 수 있고, 그래도 됩니다 — 막는 것은
+     서버(app.is_admin)이기 때문입니다.
+
+     이 검사가 보는 것은 두 가지입니다.
+       · 설정이 없거나 로그인하지 않은 사람에게 숫자가 안 보이는가
+       · 그때 빈 화면 대신 "왜 안 보이는지" 를 말해주는가
+
+     전에 통계 칸이 조용히 사라져서 "명단에 없는 건지, SQL 을 안
+     올린 건지, 고장난 건지" 를 구별할 수 없었던 적이 있습니다.
+     같은 일을 되풀이하지 않기 위한 검사입니다.
+   ============================================================ */
+{
+  console.log("── 관리 화면");
+
+  /* ① 서버 설정이 아예 없을 때 */
+  {
+    const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
+    await stubConfig(ctx);                 // 전부 비움
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    await page.goto(`${BASE}/app/admin.html`);
+    await page.waitForFunction(() => window.__adminReady === true, { timeout: 10000 });
+
+    eq(await page.locator("#stats").isVisible(), false, "설정이 없으면 숫자가 안 보인다");
+    eq(await page.locator("#sweep-card").isVisible(), false, "   사진 정리 단추도 안 보인다");
+    ok(await page.locator("#no-backend").isVisible(), "★ 대신 왜 안 되는지 말해준다");
+    eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+    await ctx.close();
+  }
+
+  /* ② 서버는 있는데 로그인하지 않았을 때 */
+  {
+    const ctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
+    await stubConfig(ctx, FAKE_SUPABASE);
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    await page.goto(`${BASE}/app/admin.html`);
+    await page.waitForFunction(() => window.__adminReady === true, { timeout: 10000 });
+
+    eq(await page.locator("#stats").isVisible(), false,
+      "★ 로그인하지 않으면 숫자가 안 보인다");
+    ok(await page.locator("#need-login").isVisible(), "   로그인하라고 말해준다");
+    eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+    await ctx.close();
+  }
 }
 
 /* ============================================================

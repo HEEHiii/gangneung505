@@ -1324,6 +1324,44 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 }
 
 
+/* ───────── 관리 화면 ───────── */
+
+/* 첫 화면의 조용한 문 — 명단에 있는 계정에만 보입니다 */
+.admin-link{margin:0 0 18px;text-align:right}
+.admin-link a{font-size:13px;color:var(--muted);text-decoration:none}
+.admin-link a:hover{color:var(--accent);text-decoration:underline}
+
+.admin-head{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;flex-wrap:wrap;margin-bottom:10px;
+}
+.admin-head .card-title{margin:0}
+.admin-range{display:flex;gap:6px}
+
+/* ★ 표가 좁은 화면에서 비어져 나가지 않게 가둡니다.
+   칸이 다섯이라 폰 폭에서는 어차피 넘칩니다 — 페이지째 밀려
+   나가는 것보다 표 안에서만 옆으로 미는 편이 낫습니다. */
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+.admin-table{
+  width:100%;border-collapse:collapse;
+  font-size:14px;font-variant-numeric:tabular-nums;
+}
+.admin-table th,.admin-table td{
+  padding:10px 12px;text-align:right;white-space:nowrap;
+  border-bottom:1px solid var(--line);
+}
+.admin-table thead th{
+  font-size:12px;font-weight:600;color:var(--muted);
+  border-bottom:1px solid var(--line-strong);
+}
+.admin-table th[scope="row"]{text-align:left;font-weight:700}
+.admin-table thead th:first-child{text-align:left}
+.admin-table tbody tr:last-child th,
+.admin-table tbody tr:last-child td{border-bottom:0}
+.admin-empty{text-align:center;color:var(--muted);padding:22px 0}
+
+
 /* ───────── 개인정보 처리방침 ───────── */
 .card h3 {
   margin: 20px 0 8px;

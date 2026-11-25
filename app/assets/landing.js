@@ -18,7 +18,7 @@ import { hasBackend, hasMap, roomUrl, KAKAO_JS_KEY, loginName } from "./config.j
 import { loadKakao, kakaoReady } from "./kakaomap.js";
 import { searchByKeyword, findHub } from "./places.js";
 import { currentUser, signIn, readReturn, sweepPending, signOut } from "./auth.js";
-import { createRoom, listMyRooms, tabReport, sweepPhotoTrash } from "./store.js";
+import { createRoom, listMyRooms, tabReport } from "./store.js";
 import { rememberRoom, recentRooms } from "./session.js";
 
 /* 직접 검색으로 고른 곳 (지역 목록에 없는 경우) */
@@ -321,76 +321,27 @@ async function showMyRooms() {
      혼자 보면 많은 건지 적은 건지 알 수 없고, 사람이 적을 때
      이 숫자로 기능을 지우는 판단을 하면 거의 틀립니다.
    ============================================================ */
-const TAB_LABEL = {
-  stay: "숙소", food: "맛집", plan: "일정", money: "정산", photo: "사진",
-};
+/* ★ 숫자는 여기서 보여주지 않습니다 — admin.html 로 옮겼습니다.
 
-/* "42초" / "3분 10초" — 평균이라 초를 버리면 짧은 탭끼리 구별이 안 됩니다 */
-function howLong(sec) {
-  const n = Math.round(sec);
-  if (!(n > 0)) return "";
-  if (n < 60) return `${n}초`;
-  const m = Math.floor(n / 60), r = n % 60;
-  return r ? `${m}분 ${r}초` : `${m}분`;
-}
+   첫 화면은 방을 만들러 온 사람의 화면입니다. 거기 통계 칸이 있으면
+   그 사람에게는 쓸모없는 자리이고, 정작 볼 사람에게는 너무 좁았습니다.
 
-async function showUsage() {
-  const box = $("#usage"), list = $("#usage-list"), note = $("#usage-note");
+   여기에는 "들어가는 문" 만 둡니다. 그 문은 명단에 있는 계정에만
+   보입니다 — tab_report 가 예외 없이 돌아오는지로 가립니다.
 
-  let rows = [];
+   숨겼다고 안전해지는 것은 아닙니다. 주소를 치면 누구나 admin.html
+   을 열 수 있고, 막는 것은 그 화면이 아니라 서버입니다
+   (admin.js 머리말 참고). 여기서 가리는 이유는 보안이 아니라,
+   쓸 수도 없는 문을 보통 사람에게 보여줄 이유가 없어서입니다. */
+async function showAdminLink() {
   try {
     const me = await currentUser();
-    if (!me) return;                 // 로그인 안 했으면 보여주지 않습니다
-    rows = await tabReport(90);
-  } catch (_) { return; }            // 명단에 없거나 함수가 없으면 조용히
+    if (!me) return;                 // 로그인 안 했으면 문도 안 보입니다
+    await tabReport(1);              // 명단에 없으면 여기서 예외가 납니다
+  } catch (_) { return; }
 
-  /* ★ 여기서 그냥 return 하면 안 됩니다.
-
-     통계는 SQL 을 올린 날부터 쌓입니다. 올린 직후에는 줄이 0개라
-     칸이 통째로 사라지는데, 그러면 "명단에 안 들어갔나? 고장났나?
-     그냥 아직 없는 건가?" 를 구별할 길이 없습니다.
-
-     tab_report 가 예외 없이 돌아왔다는 건 이미 "명단에 있다" 는
-     뜻입니다. 그러니 칸은 띄우고, 비었다고 말해줍니다.
-     칸이 보이면 권한은 통과한 것입니다. */
-  if (!Array.isArray(rows)) rows = [];
-
-  if (!rows.length) {
-    box.hidden = false;
-    list.innerHTML = "";
-    note.textContent =
-      "아직 기록이 없어요. 통계는 SQL 을 올린 날부터 쌓입니다 — " +
-      "방에 들어가서 탭을 눌러보시면 내일부터 여기 나타나요. " +
-      "이 칸이 보인다는 건 보기 권한은 제대로 들어갔다는 뜻이에요.";
-    return;
-  }
-
-  const top = Math.max(...rows.map((r) => Number(r.views) || 0), 1);
-  const sum = rows.reduce((a, r) => a + (Number(r.views) || 0), 0);
-  const since = rows
-    .map((r) => r.first_day).filter(Boolean).sort()[0];
-
-  box.hidden = false;
-  list.innerHTML = rows.map((r) => {
-    const n = Number(r.views) || 0;
-    const pct = Math.round((n / top) * 100);
-    const visits = Number(r.visits) || 0;
-    const secs = Number(r.seconds) || 0;
-    /* ★ 합계가 아니라 평균을 보여줍니다. 합계는 사람이 많은 탭이
-       무조건 이겨서, "이 탭에서 뭘 하다 가는가" 를 못 봅니다. */
-    const avg = visits ? howLong(secs / visits) : "";
-    return `
-      <li>
-        <span class="usage-name">${esc(TAB_LABEL[r.tab] || r.tab)}</span>
-        <span class="usage-bar"><span style="width:${pct}%"></span></span>
-        <span class="usage-num">${n}${avg ? ` · ${esc(avg)}` : ""}</span>
-      </li>`;
-  }).join("");
-
-  note.textContent =
-    `왼쪽 숫자는 본 사람(하루 한 번), 오른쪽은 한 번 들어와서 머문 평균 시간이에요` +
-    (since ? ` (${esc(since)} 부터, 모두 ${sum})` : ` (모두 ${sum})`) +
-    `. 방이나 사람은 기록하지 않아요.`;
+  const el = $("#admin-link");
+  if (el) el.hidden = false;
 }
 
 
@@ -500,29 +451,10 @@ async function boot() {
     location.reload();
   });
 
-  /* 지운 사진 파일 치우기 — 통계 칸 안에 있으므로 관리자만 봅니다.
-
-     ★ 평소에는 누를 일이 없습니다. 사진을 지우면 그 자리에서 파일도
-       함께 지워집니다. 이 버튼은 방 삭제나 카카오 탈퇴처럼 우리가
-       끼어들 수 없었던 경우에 남은 파일을 치우는 용도입니다. */
-  $("#sweep").addEventListener("click", async () => {
-    const btn = $("#sweep"), note = $("#sweep-note");
-    btn.disabled = true;
-    note.textContent = "정리하는 중…";
-    try {
-      const got = await sweepPhotoTrash();
-      note.textContent = got.removed
-        ? `파일 ${got.removed}개를 지웠어요. 더 있으면 한 번 더 눌러주세요.`
-        : "치울 파일이 없어요. 깨끗합니다.";
-    } catch (e) {
-      note.textContent = (e && e.message) || "정리하지 못했어요.";
-    } finally {
-      btn.disabled = false;
-    }
-  });
+  /* 지운 사진 파일 치우기는 admin.html 로 함께 옮겼습니다. */
 
   showMyRooms();
-  showUsage();            // 방장에게만, 실패하면 조용히 사라집니다
+  showAdminLink();        // 명단에 있는 계정에만 문이 보입니다
   window.__landingReady = true;
 }
 
