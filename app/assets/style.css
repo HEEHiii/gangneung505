@@ -45,11 +45,12 @@
 }
 
 /* ============================================================
-   계절 파스텔 4종
+   계절 4종
 
-   바탕은 연하게, 글씨와 강조는 충분히 진하게.
-   "파스텔"은 배경 이야기이고, 글씨까지 연해지면 안 읽힙니다.
-   tests/theme.spec.mjs 가 여덟 벌 전부 대비를 재서 막아줍니다.
+   바탕에는 색이 있고, 글씨와 강조는 충분히 진하게.
+   파스텔이 아닙니다 — 흰색에 가까운 바탕은 계절을 고른 의미가
+   없어서 버렸습니다. 대신 글씨까지 연해지면 안 읽힙니다.
+   tests/theme.spec.mjs 가 네 벌 전부 대비를 재서 막아줍니다.
    ============================================================ */
 
 /* ★ 2026-11 디자인 정리
@@ -68,30 +69,30 @@
 :root,
 :root[data-theme="summer"]{
   color-scheme:light;
-  --bg:#fbfcfd; --surface:#ffffff; --surface-2:#eef2f5;
-  --line:#e3e8ec; --line-strong:#c9d2d8;
-  --text:#23292e; --muted:#616a71; --faint:#a3abb1;
-  --accent:#1f6f8b; --accent-soft:#e6f1f6; --on-dark:#ffffff;
+  --bg:#e2efed; --surface:#ffffff; --surface-2:#d6e7e4;
+  --line:#cbe0dc; --line-strong:#aecbc6;
+  --text:#11282a; --muted:#4c6567; --faint:#56706f;
+  --accent:#0d6a6c; --accent-soft:#d0e6e3; --on-dark:#ffffff;
   --danger:#a12b1a; --ok:#1a7f4b;
 }
 
 /* ───────── 봄 ───────── */
 :root[data-theme="spring"]{
   color-scheme:light;
-  --bg:#fdfbfc; --surface:#ffffff; --surface-2:#f6eff2;
-  --line:#ebe1e5; --line-strong:#d6c4cb;
-  --text:#2b2328; --muted:#6a5c62; --faint:#a9a0a4;
-  --accent:#b8406a; --accent-soft:#fbeaf0; --on-dark:#ffffff;
+  --bg:#f6e5e7; --surface:#ffffff; --surface-2:#efdadd;
+  --line:#e7d0d3; --line-strong:#d9b4b9;
+  --text:#2a1a1d; --muted:#6a5255; --faint:#7b6165;
+  --accent:#b4283f; --accent-soft:#f2d5d9; --on-dark:#ffffff;
   --danger:#a12b1a; --ok:#1a7f4b;
 }
 
 /* ───────── 가을 ───────── */
 :root[data-theme="autumn"]{
   color-scheme:light;
-  --bg:#fdfbf7; --surface:#ffffff; --surface-2:#f6f1e8;
-  --line:#e8dfd2; --line-strong:#d4c7b4;
-  --text:#2a2420; --muted:#6b625b; --faint:#a9a099;
-  --accent:#c2491f; --accent-soft:#fbe6dc; --on-dark:#ffffff;
+  --bg:#faeedc; --surface:#ffffff; --surface-2:#f3e3cb;
+  --line:#e6d2b4; --line-strong:#d4bb93;
+  --text:#2a1d14; --muted:#6e5b46; --faint:#786851;
+  --accent:#c7351a; --accent-soft:#f6d9cb; --on-dark:#ffffff;
   --danger:#a12b1a; --ok:#1a7f4b;
 }
 
@@ -101,11 +102,11 @@
      덕분에 고를 때 보이는 색 견본과 실제 화면이 늘 일치합니다. */
 :root[data-theme="winter"]{
   color-scheme:dark;
-  --bg:#1a1f26; --surface:#242b34; --surface-2:#2b333d;
-  --line:#323c48; --line-strong:#46525f;
-  --text:#eef2f6; --muted:#9aa7b4; --faint:#67727d;
-  --accent:#7fb0e3; --accent-soft:#223243; --on-dark:#141a21;
-  --raised:#3a4553;
+  --bg:#141d2a; --surface:#1e2835; --surface-2:#263241;
+  --line:#32404f; --line-strong:#46576a;
+  --text:#edf3fa; --muted:#9babbc; --faint:#8495a8;
+  --accent:#8fc2f2; --accent-soft:#1d2f44; --on-dark:#0f1620;
+  --raised:#36465a;
   --danger:#ff9a8b; --ok:#7fd9ab;
 
   /* 어두운 바탕에서는 그림자가 안 보입니다. 더 진하게 깔아야
@@ -707,11 +708,11 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 
 /* 각 계절의 느낌을 작은 색 띠로 보여줍니다 */
 /* 그라데이션 없이 — 연한 바탕에 진한 색 띠를 단색으로 얹습니다 */
-.swatch-spring{background:#f6eff2; box-shadow:inset 0 -9px 0 #b8406a}
-.swatch-summer{background:#eef2f5; box-shadow:inset 0 -9px 0 #1f6f8b}
-.swatch-autumn{background:#f6f1e8; box-shadow:inset 0 -9px 0 #c2491f}
+.swatch-spring{background:#efdadd; box-shadow:inset 0 -9px 0 #b4283f}
+.swatch-summer{background:#d6e7e4; box-shadow:inset 0 -9px 0 #0d6a6c}
+.swatch-autumn{background:#f3e3cb; box-shadow:inset 0 -9px 0 #c7351a}
 /* 겨울은 늘 어두우므로 견본도 어둡게 — 고를 때와 실제가 같아야 합니다 */
-.swatch-winter{background:#2b333d; box-shadow:inset 0 -9px 0 #7fb0e3}
+.swatch-winter{background:#263241; box-shadow:inset 0 -9px 0 #8fc2f2}
 
 
 /* ============================================================
@@ -1024,10 +1025,10 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
   flex:0 0 12px;width:12px;height:12px;
   border:0;border-radius:99px;box-shadow:none;
 }
-.theme-opt .swatch-spring{background:#b8406a}
-.theme-opt .swatch-summer{background:#1f6f8b}
-.theme-opt .swatch-autumn{background:#c2491f}
-.theme-opt .swatch-winter{background:#7fb0e3}
+.theme-opt .swatch-spring{background:#b4283f}
+.theme-opt .swatch-summer{background:#0d6a6c}
+.theme-opt .swatch-autumn{background:#c7351a}
+.theme-opt .swatch-winter{background:#8fc2f2}
 .theme-opt:has(input:checked){
   border:2px solid var(--accent);padding:8px 3px;
   background:var(--accent-soft);
@@ -1354,7 +1355,7 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 .card-promo-text span{font-size:12px;color:rgba(255,255,255,.9)}
 .card-promo button{
   flex:0 0 auto;font:inherit;font-size:13px;font-weight:700;
-  color:#c2491f;background:#fff;border:0;border-radius:10px;
+  color:#c7351a;background:#fff;border:0;border-radius:10px;
   padding:9px 12px;cursor:pointer;
 }
 .card-promo button:focus-visible{outline:2px solid #fff;outline-offset:2px}
