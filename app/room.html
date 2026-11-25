@@ -280,6 +280,51 @@
     </form>
   </dialog>
 
+  <!-- ───────── 카드 고치기 ─────────
+       목록 안이 아니라 따로 띄웁니다. 20초마다 도는 새로고침이
+       목록을 다시 그리는데, 폼이 그 안에 있으면 쓰던 글이 날아갑니다. -->
+  <dialog id="place-edit" class="dlg">
+    <form class="dlg-box" id="place-edit-form">
+      <h2 class="dlg-title" id="place-edit-title">고치기</h2>
+
+      <label class="field">
+        <span class="field-label">이름</span>
+        <input id="pe-name" maxlength="80" required>
+      </label>
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">1박 가격</span>
+          <input id="pe-price" type="number" inputmode="numeric" min="0" placeholder="비워도 돼요">
+        </label>
+        <label class="field">
+          <span class="field-label">인원</span>
+          <input id="pe-capacity" maxlength="40" placeholder="예: 4인">
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="field-label">메모</span>
+        <input id="pe-note" maxlength="300" placeholder="비워도 돼요">
+      </label>
+
+      <label class="field">
+        <span class="field-label">링크</span>
+        <input id="pe-url" maxlength="500" placeholder="예약 페이지 주소">
+      </label>
+
+      <p class="field-note">
+        위치는 여기서 못 바꿔요. 장소 자체가 다르면 지우고 다시 넣어주세요.
+      </p>
+      <p class="field-note err" id="pe-err" hidden></p>
+
+      <div class="dlg-acts">
+        <button type="button" class="btn-quiet" id="pe-cancel">취소</button>
+        <button type="submit" class="btn-primary" id="pe-save">저장</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="photo-view" class="dlg photo-dlg">
     <form method="dialog" class="dlg-box photo-box" tabindex="-1">
       <img id="photo-big" alt="">

@@ -262,6 +262,95 @@ select pg_temp.must_fail(
   '[denied]', '남이 넣은 장소는 못 지움');
 
 
+-- ------------------------------------------------------------
+--  4-2. 장소 고치기 (0013)
+--
+--  ★ 고치기가 없으면 "오타 하나 = 투표 초기화" 입니다. 지우고 다시
+--    넣는 수밖에 없고, 그러면 그 카드의 투표와 댓글이 같이 사라집니다.
+--    그래서 여기서 제일 중요한 건 "고친 뒤에도 표가 남는가" 입니다.
+-- ------------------------------------------------------------
+\echo '── 4-2. 장소 고치기'
+
+-- 남의 장소는 못 고친다 (지우기와 같은 규칙)
+select pg_temp.must_fail(
+  format($$ select public.place_edit(%L, 'voter-B', %L, '{"name":"가로채기"}'::jsonb) $$,
+    (select v::jsonb ->> 'token' from t where k = 'tok1'),
+    (select v::jsonb ->> 'id' from t where k = 'place1')),
+  '[denied]', '★ 남이 넣은 장소는 못 고침');
+
+-- 이름은 비울 수 없다
+select pg_temp.must_fail(
+  format($$ select public.place_edit(%L, 'voter-A', %L, '{"name":"   "}'::jsonb) $$,
+    (select v::jsonb ->> 'token' from t where k = 'tok1'),
+    (select v::jsonb ->> 'id' from t where k = 'place1')),
+  '[invalid]', '이름을 비우면 거부');
+
+-- 내가 넣은 장소는 고칠 수 있다
+insert into t select 'ed1', (public.place_edit(
+  (select v::jsonb ->> 'token' from t where k = 'tok1'), 'voter-A',
+  (select (v::jsonb ->> 'id')::uuid from t where k = 'place1'),
+  '{"name":"고친 이름","note":"바다 보임","price":"180000","capacity":"4인"}'::jsonb))::text;
+
+/* 표를 직접 들여다볼 때만 잠깐 권한을 올립니다.
+   (이 묶음은 친구 입장을 흉내 내려고 anon 으로 돌고 있습니다) */
+reset role;
+select pg_temp.ok(
+  (select name from app.places
+    where id = (select (v::jsonb ->> 'id')::uuid from t where k = 'place1')) = '고친 이름',
+  '이름이 바뀐다');
+select pg_temp.ok(
+  (select price from app.places
+    where id = (select (v::jsonb ->> 'id')::uuid from t where k = 'place1')) = 180000,
+  '가격이 바뀐다');
+
+-- ★★ 표가 그대로 남아 있어야 합니다 (위에서 1표를 만들어 뒀습니다)
+select pg_temp.ok(
+  (select count(*) from app.votes
+    where place_id = (select (v::jsonb ->> 'id')::uuid from t where k = 'place1')) = 1,
+  '★★ 고쳐도 표가 그대로 남는다');
+set role anon;
+
+/* ★ 보낸 칸만 바뀌어야 합니다.
+
+   coalesce 로 "없으면 원래 값" 을 쓰면 비우기가 안 되고, 반대로
+   무조건 덮어쓰면 메모만 고치려다 가격이 날아갑니다. 칸이 왔는지
+   자체를 보는지 확인합니다. */
+insert into t select 'ed2', (public.place_edit(
+  (select v::jsonb ->> 'token' from t where k = 'tok1'), 'voter-A',
+  (select (v::jsonb ->> 'id')::uuid from t where k = 'place1'),
+  '{"note":"메모만 고침"}'::jsonb))::text;
+
+reset role;
+select pg_temp.ok(
+  (select price from app.places
+    where id = (select (v::jsonb ->> 'id')::uuid from t where k = 'place1')) = 180000,
+  '★ 메모만 보냈을 때 가격이 안 날아간다');
+select pg_temp.ok(
+  (select name from app.places
+    where id = (select (v::jsonb ->> 'id')::uuid from t where k = 'place1')) = '고친 이름',
+  '   이름도 그대로다');
+set role anon;
+
+-- 빈 문자열을 보내면 "비우기" 입니다 (안 보낸 것과 달라야 합니다)
+insert into t select 'ed3', (public.place_edit(
+  (select v::jsonb ->> 'token' from t where k = 'tok1'), 'voter-A',
+  (select (v::jsonb ->> 'id')::uuid from t where k = 'place1'),
+  '{"note":""}'::jsonb))::text;
+
+reset role;
+select pg_temp.ok(
+  (select note from app.places
+    where id = (select (v::jsonb ->> 'id')::uuid from t where k = 'place1')) is null,
+  '빈 값을 보내면 비워진다 (안 보낸 것과 구별된다)');
+set role anon;
+
+-- 원래대로 되돌려 둡니다 (뒤 검사들이 이 장소를 그대로 씁니다)
+insert into t select 'ed4', (public.place_edit(
+  (select v::jsonb ->> 'token' from t where k = 'tok1'), 'voter-A',
+  (select (v::jsonb ->> 'id')::uuid from t where k = 'place1'),
+  '{"name":"오붓한강릉","note":"사천해변 도보권","price":"","capacity":""}'::jsonb))::text;
+
+
 -- ============================================================
 --  5. 스냅샷
 -- ============================================================

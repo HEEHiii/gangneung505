@@ -429,6 +429,7 @@ function renderLodgings() {
                     aria-label="투표하기" aria-pressed="false"${state.loaded ? "" : " disabled"}>
               <svg class="heart" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9A5.3 5.3 0 0 1 12 6.6 5.3 5.3 0 0 1 21.5 12c-2 4.4-9.5 9-9.5 9z"></path></svg><span class="vote-count" data-count="${esc(d.id)}">0</span>
             </button>
+            ${canDelete(d.mine) ? `<button class="btn-quiet btn-edit" type="button" data-edit="${esc(d.id)}" aria-label="${esc(d.name)} 고치기">고치기</button>` : ""}
             ${canDelete(d.mine) ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
           </div>
           <div class="vote-bar none" data-bar="${esc(d.id)}" aria-hidden="true"><span style="width:0"></span></div>
@@ -501,6 +502,7 @@ function renderFood() {
                       aria-label="투표하기" aria-pressed="false"${state.loaded ? "" : " disabled"}>
                 <svg class="heart" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9A5.3 5.3 0 0 1 12 6.6 5.3 5.3 0 0 1 21.5 12c-2 4.4-9.5 9-9.5 9z"></path></svg><span class="vote-count" data-count="${esc(d.id)}">0</span>
               </button>
+              ${canDelete(d.mine) ? `<button class="btn-quiet btn-edit" type="button" data-edit="${esc(d.id)}" aria-label="${esc(d.name)} 고치기">고치기</button>` : ""}
               ${canDelete(d.mine) ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
             </div>
               <div class="vote-bar none" data-bar="${esc(d.id)}" aria-hidden="true"><span style="width:0"></span></div>
@@ -534,10 +536,29 @@ function renderFood() {
 /* ============================================================
    8. 목록 공통 — 클릭·선택·투표·삭제
    ============================================================ */
+/* 고치기 창은 목록 둘이 같이 씁니다 — 한 번만 연결합니다 */
+let editWired = false;
+function wireEditDialog() {
+  if (editWired) return;
+  editWired = true;
+
+  $("#place-edit-form").addEventListener("submit", (ev) => {
+    ev.preventDefault();          // 기본 제출은 창만 닫고 저장은 안 합니다
+    saveEdit();
+  });
+  $("#pe-cancel").addEventListener("click", closeEdit);
+  /* Esc 로 닫아도 상태가 남지 않게 */
+  $("#place-edit").addEventListener("close", () => { editingId = null; });
+}
+
 function wireList(sel, mapKey, label) {
   const ul = $(sel);
+  wireEditDialog();
 
   ul.addEventListener("click", (e) => {
+    const edit = e.target.closest("[data-edit]");
+    if (edit) { e.stopPropagation(); return openEdit(edit.dataset.edit, label); }
+
     const del = e.target.closest("[data-del]");
     if (del) { e.stopPropagation(); return onDelete(del.dataset.del, label); }
 
@@ -724,6 +745,87 @@ async function onVote(id) {
     state.mine = before.mine;
     paintVotes();
     toast(e.message || "투표를 저장하지 못했어요");
+  }
+}
+
+/* ============================================================
+   카드 고치기
+
+   ★ 왜 고치기가 필요한가: 전에는 추가와 삭제뿐이었습니다. 이름에
+     오타가 나면 지우고 다시 넣어야 했는데, 그러면 그 카드에 모인
+     투표와 댓글이 같이 사라집니다. "오타 하나 = 투표 초기화" 였습니다.
+
+   ★ 위치는 못 고칩니다. 좌표를 손으로 바꾸면 지도 핀과 카드가
+     어긋나기 쉽고, 제대로 하려면 지도에서 찍는 화면이 따로
+     있어야 합니다. 장소 자체가 다르면 지우고 다시 넣는 게 맞습니다
+     — 그때는 투표가 사라지는 것도 맞고요. 다른 곳이니까요.
+   ============================================================ */
+let editingId = null;
+
+function openEdit(id, label) {
+  const item = state.places.find((x) => x.id === id);
+  if (!item) return;
+
+  editingId = id;
+  $("#place-edit-title").textContent = `${label} 고치기`;
+  $("#pe-name").value = item.name || "";
+  $("#pe-price").value = item.price == null ? "" : String(item.price);
+  $("#pe-capacity").value = item.capacity || "";
+  $("#pe-note").value = item.note || "";
+  $("#pe-url").value = item.url || "";
+  $("#pe-err").hidden = true;
+  $("#pe-save").disabled = false;
+
+  const dlg = $("#place-edit");
+  if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+  $("#pe-name").focus();
+}
+
+function closeEdit() {
+  editingId = null;
+  const dlg = $("#place-edit");
+  if (typeof dlg.close === "function") dlg.close(); else dlg.removeAttribute("open");
+}
+
+async function saveEdit() {
+  const id = editingId;
+  if (!id) return;
+
+  const data = {
+    name: $("#pe-name").value.trim(),
+    price: $("#pe-price").value.trim(),
+    capacity: $("#pe-capacity").value.trim(),
+    note: $("#pe-note").value.trim(),
+    url: $("#pe-url").value.trim(),
+  };
+
+  const err = $("#pe-err");
+  if (!data.name) {
+    err.textContent = "이름은 비울 수 없어요";
+    err.hidden = false;
+    $("#pe-name").focus();
+    return;
+  }
+
+  /* 먼저 화면에 반영하고, 실패하면 되돌립니다 (투표·삭제와 같은 방식) */
+  const before = state.places.map((x) => ({ ...x }));
+  const row = state.places.find((x) => x.id === id);
+  if (row) {
+    row.name = data.name;
+    row.price = data.price === "" ? null : Number(data.price);
+    row.capacity = data.capacity || null;
+    row.note = data.note || null;
+    row.url = data.url || null;
+  }
+  closeEdit();
+  redrawAll();
+
+  try {
+    await store.placeEdit(id, data);
+  } catch (e) {
+    state.places = before;
+    redrawAll();
+    toast(e.message || "고치지 못했어요");
   }
 }
 

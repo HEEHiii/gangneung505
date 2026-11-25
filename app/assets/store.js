@@ -360,6 +360,46 @@ export function createStore(slug) {
       return await rpc("place_add", { p_token: need(), p_voter: voter, p_data: clean });
     },
 
+    /* ---------- 장소 고치기 ----------
+
+       ★ 보낸 칸만 바뀝니다. 안 보낸 칸은 그대로 둡니다.
+         그래야 메모만 고치려다 가격이 날아가는 일이 없습니다.
+         반대로 빈 문자열을 보내면 "비우기" 가 됩니다. */
+    async placeEdit(id, data) {
+      const clean = {};
+      if ("name" in data) clean.name = String(data.name || "").trim().slice(0, 80);
+      if ("note" in data) clean.note = String(data.note || "").slice(0, 300);
+      if ("url" in data) clean.url = String(data.url || "").trim().slice(0, 500);
+      if ("capacity" in data) clean.capacity = String(data.capacity || "").trim().slice(0, 40);
+      if ("price" in data) {
+        clean.price = data.price === "" || data.price == null ? "" : String(Number(data.price));
+      }
+
+      if ("name" in clean && clean.name === "") {
+        throw new RpcError("invalid", "이름은 비울 수 없어요", "empty name");
+      }
+
+      need();
+      if (!online) {
+        const box = lread(slug);
+        if (!box) throw new RpcError("expired", "이 브라우저에 저장된 방이 없어요.", "local miss");
+        const p = box.places.find((x) => x.id === id && !x.deleted_at);
+        if (!p) throw new RpcError("denied", "없는 장소예요", "miss");
+        if (!canDropLocal(p.created_by)) {
+          throw new RpcError("denied", "직접 추가한 곳만 고칠 수 있어요", "not mine");
+        }
+        if ("name" in clean) p.name = clean.name;
+        if ("note" in clean) p.note = clean.note || null;
+        if ("url" in clean) p.url = clean.url || null;
+        if ("capacity" in clean) p.capacity = clean.capacity || null;
+        if ("price" in clean) p.price = clean.price === "" ? null : Number(clean.price);
+        lwrite(slug, box);
+        return { ok: true, id };
+      }
+
+      return await rpc("place_edit", { p_token: need(), p_voter: voter, p_id: id, p_data: clean });
+    },
+
     /* ---------- 장소 지우기 (되돌릴 수 있게 표시만) ---------- */
     async placeRemove(id) {
       need();

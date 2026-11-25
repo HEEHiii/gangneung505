@@ -939,6 +939,20 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 }
 .btn-danger:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 
+/* ───────── 카드 고치기 창 ───────── */
+#place-edit{
+  width:min(92vw,440px);padding:0;border:0;border-radius:var(--r);
+  background:transparent;color:var(--text);
+}
+#place-edit::backdrop{background:rgba(0,0,0,.45)}
+.dlg-title{margin:0 0 14px;font-size:17px;font-weight:700}
+.dlg-acts{display:flex;gap:8px;margin-top:16px}
+.dlg-acts .btn-quiet,.dlg-acts .btn-primary{flex:1 1 0;margin:0;text-align:center}
+.field-note.err{color:var(--danger);font-weight:600}
+
+/* 카드 안의 '고치기' — 삭제 옆에 조용히 */
+.btn-edit{font-size:12px;padding:6px 10px}
+
 
 
 /* ============================================================

@@ -824,6 +824,85 @@ console.log("── 맛집 카드 → 지도 이동");
 
 
 /* ============================================================
+   카드 고치기
+
+   ★ 왜 필요한가: 전에는 추가와 삭제뿐이었습니다. 이름에 오타가
+     나면 지우고 다시 넣어야 했는데, 그러면 그 카드에 모인 투표와
+     댓글이 같이 사라집니다. "오타 하나 = 투표 초기화" 였습니다.
+     그래서 이 검사의 핵심은 "고친 뒤에도 투표가 남아 있는가" 입니다.
+   ============================================================ */
+console.log("── 카드 고치기");
+{
+  const { ctx, page, errors } = await fresh();
+  await openRoom(page, await makeRoom(page, { title: "고치기" }));
+  await enter(page);
+  await page.waitForTimeout(300);
+
+  const addStay = async (name, lat, lng) => {
+    const box = "#adder-stay";
+    if (!(await page.locator(`${box} .a-q`).isVisible())) {
+      await page.click(`${box} summary`);
+      await page.locator(`${box} .a-q`).waitFor({ state: "visible", timeout: 5000 });
+    }
+    await page.fill(`${box} .a-q`, `https://map.kakao.com/link/map/${name},${lat},${lng}`);
+    await page.click(`${box} .a-find`);
+    await page.waitForTimeout(700);
+  };
+  await addStay("오붓한강릉", 37.8250, 128.8780);
+
+  const card = () => page.locator("#lodging-list .card").first();
+
+  /* 투표를 해 둡니다 — 고친 뒤에도 남아 있어야 합니다 */
+  await card().locator("[data-vote]").click();
+  await page.waitForTimeout(400);
+  eq((await card().locator(".vote-count").textContent()).trim(), "1", "먼저 투표를 해 둔다");
+
+  await card().locator("[data-edit]").click();
+  await page.locator("#place-edit").waitFor({ state: "visible", timeout: 5000 });
+
+  eq(await page.inputValue("#pe-name"), "오붓한강릉", "지금 이름이 채워져 있다");
+
+  await page.fill("#pe-name", "오붓한 강릉");
+  await page.fill("#pe-price", "180000");
+  await page.fill("#pe-capacity", "4인");
+  await page.fill("#pe-note", "바다 보임");
+  await page.click("#pe-save");
+  await page.waitForTimeout(600);
+
+  eq((await card().locator(".card-name").textContent()).trim().split("\n")[0].trim(),
+    "오붓한 강릉", "★ 이름이 바뀐다");
+  ok((await card().textContent()).includes("바다 보임"), "메모가 들어간다");
+  ok((await card().textContent()).includes("4인"), "인원이 들어간다");
+
+  eq((await card().locator(".vote-count").textContent()).trim(), "1",
+    "★★ 고쳐도 투표가 그대로 남는다 (지우고 다시 넣으면 사라집니다)");
+
+  /* 새로고침해도 남아 있어야 진짜 저장된 것입니다.
+     (토큰이 남아 있어 게이트는 다시 안 뜹니다 — enter 를 또 부르면 안 됩니다) */
+  await page.reload();
+  await page.locator("#lodging-list .card").first()
+    .waitFor({ state: "visible", timeout: 10000 });
+  ok((await card().textContent()).includes("오붓한 강릉"),
+    "★ 새로고침해도 고친 이름이 남는다");
+
+  /* 이름을 비우면 막아야 합니다 */
+  await card().locator("[data-edit]").click();
+  await page.locator("#place-edit").waitFor({ state: "visible", timeout: 5000 });
+  await page.fill("#pe-name", "   ");
+  await page.click("#pe-save");
+  await page.waitForTimeout(300);
+  ok(await page.locator("#place-edit").isVisible(), "이름을 비우면 창이 안 닫힌다");
+  ok(await page.locator("#pe-err").isVisible(), "   왜 안 되는지 알려준다");
+  await page.click("#pe-cancel");
+  await page.waitForTimeout(200);
+  ok((await card().textContent()).includes("오붓한 강릉"), "취소하면 그대로다");
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
+
+/* ============================================================
    지도 범례가 위쪽 탭을 가리지 않는다
 
    ★ 사장님이 캡처로 잡아주신 것:

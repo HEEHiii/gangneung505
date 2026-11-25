@@ -35,6 +35,7 @@ export const RPC = {
   room_join:     ["p_slug", "p_password"],
   room_snapshot: ["p_token", "p_voter", "p_since"],
   place_add:     ["p_token", "p_voter", "p_data"],
+  place_edit:    ["p_token", "p_voter", "p_id", "p_data"],
   place_remove:  ["p_token", "p_voter", "p_id"],
   vote_set:      ["p_token", "p_voter", "p_place_id", "p_on"],
   room_touch:    ["p_token"],
