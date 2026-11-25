@@ -331,10 +331,42 @@ console.log("── 폼 칸 너비");
   const gap = end.x - (start.x + start.width);
   ok(gap >= 6, `출발·도착 사이 간격이 살아 있다  (${gap.toFixed(1)}px)`);
 
-  /* 위아래 칸들끼리도 너비가 같다 */
-  const widths = [title.width, people.width, region.width];
-  ok(Math.max(...widths) - Math.min(...widths) <= 1,
-    `이름·인원·지역 칸 너비가 서로 같다  (${widths.map((w) => w.toFixed(0)).join(" / ")})`);
+  /* ★ 인원과 지역은 이제 한 줄입니다 (2026-11 짜임새 정리).
+
+     전에는 "이름·인원·지역 칸 너비가 서로 같다" 였는데, 그건
+     그때의 배치를 그대로 적어둔 것이지 지켜야 할 성질이 아니었습니다.
+     지켜야 할 성질은 이 묶음 머리말에 있습니다 — 칸이 카드 밖으로
+     비어져 나가지 않는 것. 그걸 새 배치에 맞춰 다시 잽니다. */
+  const pairRight2 = region.x + region.width;
+  ok(pairRight2 <= titleRight + 1,
+    `인원·지역 두 칸이 위 칸 밖으로 안 나간다  (오른쪽 끝 ${pairRight2.toFixed(1)} ≤ ${titleRight.toFixed(1)})`);
+
+  ok(Math.abs(people.x - title.x) <= 1,
+    "인원 칸 왼쪽 끝이 위 칸과 맞다");
+
+  const pairGap = region.x - (people.x + people.width);
+  ok(pairGap >= 6, `인원·지역 사이 간격이 살아 있다  (${pairGap.toFixed(1)}px)`);
+
+  /* ★ 인원 칸이 너무 좁아지면 "4" 와 "명" 이 겹칩니다 */
+  ok(people.width >= 88, `인원 칸이 좁아지지 않는다  (${people.width.toFixed(0)}px)`);
+
+  /* ★ 밤 수는 날짜 머리말과 같은 줄에 있어야 합니다.
+     아래에 따로 두면 같은 말(날짜)을 두 번 하면서 한 줄을 더 먹습니다. */
+  const nights = await box("#nights-note");
+  const label = await box(".field-head .field-label");
+  ok(Math.abs((nights.y + nights.height / 2) - (label.y + label.height / 2)) <= 10,
+    `★ 밤 수가 날짜 머리말과 같은 줄에 있다  (${nights.y.toFixed(0)} vs ${label.y.toFixed(0)})`);
+  ok(nights.x > label.x + label.width,
+    "밤 수가 머리말 오른쪽에 있다");
+  eq((await page.locator("#nights-note").textContent()).trim(), "1박 2일",
+    "밤 수만 짧게 적는다");
+
+  /* ★ "여행방 만들기" 가 폼을 끝까지 안 내려도 보여야 합니다.
+     전에는 비밀번호까지 내려가야 버튼이 나왔습니다. */
+  const vh = page.viewportSize().height;
+  const btn = await box("#btn-make");
+  ok(btn.y + btn.height <= vh + 1,
+    `★ 만들기 버튼이 첫 화면에서 바로 보인다  (아래 끝 ${(btn.y + btn.height).toFixed(0)} ≤ ${vh})`);
 
   /* 가로 스크롤이 생기지 않는다 */
   const overflow = await page.evaluate(() =>

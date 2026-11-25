@@ -57,29 +57,34 @@
         <input id="f-title" maxlength="30" placeholder="예: 겨울 강릉" required>
       </label>
 
-      <div class="field-row">
+      <!-- 날짜 두 칸을 한 줄로, 밤 수는 머리말 오른쪽에 -->
+      <div class="field">
+        <div class="field-head">
+          <span class="field-label">언제 가요?</span>
+          <span class="nights" id="nights-note"></span>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <input id="f-start" type="date" aria-label="출발일" required>
+          </label>
+          <label class="field">
+            <input id="f-end" type="date" aria-label="도착일" required>
+          </label>
+        </div>
+      </div>
+
+      <!-- 인원과 지역을 한 줄로 -->
+      <div class="field-row pair">
         <label class="field">
-          <span class="field-label">출발</span>
-          <input id="f-start" type="date" required>
+          <span class="field-label">인원</span>
+          <input id="f-people" type="number" inputmode="numeric" min="1" max="30" value="4" required>
+          <span class="field-suffix">명</span>
         </label>
         <label class="field">
-          <span class="field-label">도착</span>
-          <input id="f-end" type="date" required>
+          <span class="field-label">어디로 가요?</span>
+          <select id="f-region"></select>
         </label>
       </div>
-      <p class="field-note" id="nights-note"></p>
-
-      <label class="field">
-        <span class="field-label">인원</span>
-        <input id="f-people" type="number" inputmode="numeric" min="1" max="30" value="4" required>
-        <span class="field-suffix">명</span>
-      </label>
-
-      <!-- 지역 -->
-      <label class="field">
-        <span class="field-label">어디로 가요?</span>
-        <select id="f-region"></select>
-      </label>
 
       <!-- 목록에 없는 곳은 검색으로 -->
       <div class="field sub-field" id="custom-wrap" hidden>
@@ -118,8 +123,10 @@
 
       <p class="form-error" id="form-error" role="alert" aria-live="polite"></p>
 
-      <button type="submit" class="btn-primary" id="btn-make">방 만들기</button>
-      <p class="field-note center" id="login-note"></p>
+      <div class="submit-bar">
+        <button type="submit" class="btn-primary" id="btn-make">여행방 만들기</button>
+        <p class="field-note center" id="login-note"></p>
+      </div>
     </form>
   </section>
 

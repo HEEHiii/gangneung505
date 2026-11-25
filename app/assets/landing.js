@@ -83,7 +83,13 @@ function updateNights() {
     return;
   }
   note.classList.remove("bad");
-  note.textContent = fmtRange(s, e) + (days.length > 15 ? " — 너무 길어요 (최대 15일)" : "");
+  /* ★ 날짜 전체가 아니라 밤 수만 적습니다.
+     바로 위 두 칸에 날짜가 이미 있는데 그 아래 또 쓰면 같은 말을
+     두 번 하는 것이고, 한 줄을 통째로 더 먹습니다. */
+  note.textContent = days.length > 15
+    ? "너무 길어요 (최대 15일)"
+    : `${days.length - 1}박 ${days.length}일`;
+  if (days.length > 15) note.classList.add("bad");
   // 날짜가 바뀌면 계절도 따라갑니다 (아직 손대지 않았을 때만)
   if (!$("#f-theme").dataset.touched) setTheme(seasonFor(s));
 }
