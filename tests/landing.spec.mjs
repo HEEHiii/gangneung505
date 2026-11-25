@@ -350,6 +350,34 @@ console.log("── 폼 칸 너비");
   /* ★ 인원 칸이 너무 좁아지면 "4" 와 "명" 이 겹칩니다 */
   ok(people.width >= 88, `인원 칸이 좁아지지 않는다  (${people.width.toFixed(0)}px)`);
 
+  /* ★★ 높이도 같아야 합니다 — 너비만 재고 있었습니다.
+
+     나란히 선 칸인데 인원 48px, 지역 47px, 날짜 50px 이었습니다.
+     높이를 안 정해두면 <input>, <select>, <input type=date> 가
+     글자를 담는 방식이 달라서 제각각 계산합니다. 크롬에서는 1~2px
+     차이라 눈에 잘 안 띄는데, 아이폰 사파리에서는 더 벌어져서
+     "칸 크기가 안 맞는다" 로 보입니다.
+
+     데스크톱에서 멀쩡해 보이므로 이것도 숫자로 재야 잡힙니다. */
+  const hs = [["출발", start], ["도착", end], ["이름", title],
+              ["인원", people], ["지역", region]];
+  const minH = Math.min(...hs.map(([, b]) => b.height));
+  const maxH = Math.max(...hs.map(([, b]) => b.height));
+  ok(maxH - minH <= 1,
+    `★ 입력 칸 높이가 서로 같다  (${hs.map(([n, b]) => `${n} ${b.height.toFixed(0)}`).join(", ")})`);
+
+  /* 손가락이 누를 수 있는 크기 */
+  ok(minH >= 44, `입력 칸이 손가락 크기(44px) 이상이다  (${minH.toFixed(0)}px)`);
+
+  /* ★ "명" 이 숫자 위로 올라타거나 칸 밖으로 나가면 안 됩니다 */
+  const suffix = await box(".field-suffix");
+  const peopleMid = people.y + people.height / 2;
+  const suffixMid = suffix.y + suffix.height / 2;
+  ok(Math.abs(suffixMid - peopleMid) <= 2,
+    `"명" 이 인원 칸 가운데 있다  (${suffixMid.toFixed(0)} vs ${peopleMid.toFixed(0)})`);
+  ok(suffix.x + suffix.width <= people.x + people.width,
+    '"명" 이 칸 밖으로 안 나간다');
+
   /* ★ 밤 수는 날짜 머리말과 같은 줄에 있어야 합니다.
      아래에 따로 두면 같은 말(날짜)을 두 번 하면서 한 줄을 더 먹습니다. */
   const nights = await box("#nights-note");

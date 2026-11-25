@@ -777,6 +777,7 @@ console.log("── 맛집 카드 → 지도 이동");
   await page.waitForTimeout(400);
   eq(await center(), "37.8960,128.8295", "다른 카드를 누르면 그쪽으로 간다");
 
+
   /* ★ 핵심: 새로고침이 돌아도 확대가 풀리지 않아야 합니다 */
   await page.evaluate(() => window.__refreshNow && window.__refreshNow());
   await page.waitForTimeout(600);
@@ -789,6 +790,123 @@ console.log("── 맛집 카드 → 지도 이동");
   await page.waitForTimeout(400);
   eq(await page.locator("#food-list .card.sel").count(), 0,
     "같은 카드를 다시 누르면 선택이 풀린다");
+
+  /* ★★ 멀리 떨어진 곳을 "전체 보기" 상태에서 처음 누를 때
+
+     사장님이 영상으로 잡아주신 증상입니다. 카드를 연달아 누를
+     때는 멀쩡한데, 전체 보기로 돌아간 뒤 먼 곳을 누르면 핀이
+     없는 엉뚱한 자리가 확대됐습니다.
+
+     원인은 panTo(부드럽게 이동) 직후에 setLevel 이 끼어들어 이동을
+     끊은 것이었습니다. 이미 확대돼 있으면 setLevel 이 아예 안 불려서
+     멀쩡하고, 멀리서 처음 누를 때만 깨집니다 — 그래서 "먼 곳만"
+     이라는 모양으로 보였습니다.
+
+     바로 위에서 선택을 풀어 전체 보기로 돌아왔습니다. 그 상태가
+     이 검사의 출발점입니다. */
+  const level = async () => page.evaluate(() => {
+    const m = window.__kmaps && window.__kmaps["map-food"];
+    return m ? m.getLevel() : -1;
+  });
+
+  const wideLevel = await level();
+  ok(wideLevel > 5, `전체 보기라 확대가 풀려 있다  (단계 ${wideLevel})`);
+
+  await clickCard("초당순두부");            // 여기서 깨졌습니다
+  await page.waitForTimeout(400);
+  eq(await center(), "37.7956,128.9142",
+    "★ 전체 보기에서 먼 카드를 눌러도 그 카드가 중심이다");
+  ok((await level()) <= 5, `   그리고 확대도 같이 된다  (단계 ${await level()})`);
+
+  eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
+  await ctx.close();
+}
+
+
+/* ============================================================
+   지도 범례가 위쪽 탭을 가리지 않는다
+
+   ★ 사장님이 캡처로 잡아주신 것:
+     숙소 탭에서 스크롤하면 지도 위에 떠 있는 "전부 / 숙소만 /
+     관광지만" 알약이 위에 붙어 있는 숙소·맛집 탭을 덮었습니다.
+
+   범례는 z-index:400, 상단바는 20 입니다. 지도 안에 있으니
+   괜찮을 것 같지만, 감싸는 .map-wrap 이 position:relative 만 있고
+   z-index 가 없으면 "쌓임 맥락"을 만들지 않습니다. 그러면 400 이
+   지도 안이 아니라 페이지 전체에서 겨뤄서 상단바를 이깁니다.
+
+   눈으로만 보면 스크롤을 특정 위치까지 내렸을 때만 보이는
+   문제라 놓치기 쉽습니다. 실제로 그 자리에서 무엇이 손에 닿는지
+   (elementFromPoint) 로 잽니다 — 보이기만 하는 게 아니라
+   눌리기까지 하니까요.
+   ============================================================ */
+console.log("── 지도 범례 vs 위쪽 탭");
+{
+  const { ctx, page, errors } = await fresh();
+  await openRoom(page, await makeRoom(page, { title: "범례 겹침" }));
+  await enter(page);
+  await page.waitForTimeout(400);
+
+  const legend = page.locator(".map-wrap .map-legend").first();
+  await legend.waitFor({ state: "visible", timeout: 5000 });
+
+  /* ★ 후보를 몇 개 넣어 페이지를 길게 만듭니다.
+     빈 방은 내용이 화면보다 짧아서 스크롤 자체가 안 됩니다 —
+     그러면 "겹치는 지점까지 내렸다" 가 영영 false 가 됩니다. */
+  const addStay = async (name, lat, lng) => {
+    const box = "#adder-stay";
+    if (!(await page.locator(`${box} .a-q`).isVisible())) {
+      await page.click(`${box} summary`);
+      await page.locator(`${box} .a-q`).waitFor({ state: "visible", timeout: 5000 });
+    }
+    await page.fill(`${box} .a-q`, `https://map.kakao.com/link/map/${name},${lat},${lng}`);
+    await page.click(`${box} .a-find`);
+    await page.waitForTimeout(700);
+  };
+  await addStay("경포펜션", 37.7956, 128.9142);
+  await addStay("강릉역호텔", 37.7640, 128.8990);
+  await addStay("정동진스테이", 37.6900, 129.0340);
+  await page.waitForTimeout(300);
+
+  const scrollable = await page.evaluate(
+    () => document.documentElement.scrollHeight - window.innerHeight);
+  ok(scrollable > 120, `페이지가 스크롤될 만큼 길다  (${scrollable}px)`);
+
+  /* 더듬지 않고, 범례 가운데가 상단바 가운데에 오도록 바로 내립니다 */
+  const r = await page.evaluate(() => {
+    const lg = document.querySelector(".map-wrap .map-legend");
+    const bar = document.querySelector(".topbar");
+    const a = lg.getBoundingClientRect(), b = bar.getBoundingClientRect();
+    const want = (a.top + window.scrollY + a.height / 2) - b.height / 2;
+    window.scrollTo(0, want);
+    return { want, max: document.documentElement.scrollHeight - window.innerHeight };
+  });
+  await page.waitForTimeout(200);
+
+  ok(r.want <= r.max + 1,
+    `겹치는 자리까지 내릴 수 있다  (필요 ${r.want.toFixed(0)}px ≤ 가능 ${r.max.toFixed(0)}px)`);
+
+  const hit = await page.evaluate(() => {
+    const lg = document.querySelector(".map-wrap .map-legend");
+    const bar = document.querySelector(".topbar");
+    const a = lg.getBoundingClientRect(), b = bar.getBoundingClientRect();
+    const x = a.left + a.width / 2, y = a.top + a.height / 2;
+    const el = document.elementFromPoint(x, y);
+    return {
+      inBar: y >= b.top && y <= b.bottom,
+      onLegend: !!(el && el.closest(".map-legend")),
+      onBar: !!(el && el.closest(".topbar")),
+      tag: el ? String(el.className || el.tagName) : "없음",
+      y: +y.toFixed(0), barBottom: +b.bottom.toFixed(0),
+    };
+  });
+
+  ok(hit.inBar,
+    `범례가 상단바와 겹친다  (범례 가운데 y=${hit.y}, 상단바 아래 ${hit.barBottom})`);
+  ok(!hit.onLegend,
+    `★ 겹치는 자리에서 손에 닿는 것이 범례가 아니다  (닿은 것: ${hit.tag})`);
+  ok(hit.onBar,
+    "   상단바(탭)가 범례보다 위에 있다");
 
   eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
   await ctx.close();

@@ -50,10 +50,44 @@
   }
   KMap.prototype.setZoomable = function (v) { this._zoomable = !!v; };
   KMap.prototype.getLevel = function () { return this._level; };
-  KMap.prototype.setLevel = function (v) { this._level = v; };
+  /* ★ panTo 는 "순간이동"이 아닙니다.
+
+     진짜 카카오 panTo 는 중심을 부드럽게 옮깁니다. 그 움직임이
+     끝나기 전에 setLevel 이 끼어들면 이동이 중간에서 끊기고,
+     지도는 목적지가 아니라 가다 만 자리를 중심으로 확대합니다.
+
+     전에는 여기서 _center 를 바로 바꿔버려서, 아래 두 줄짜리
+     진짜 버그를 검사가 통째로 못 봤습니다.
+
+         map.panTo(목적지);
+         map.setLevel(5);        // ← 이동을 끊습니다
+
+     가까운 곳은 이동이 짧아 티가 안 나고, 먼 곳일수록 엉뚱한
+     데가 확대됩니다. 사장님이 영상으로 잡아주신 그 증상입니다.
+
+     그래서 스텁도 똑같이 "한 박자 뒤에 도착"하게 하고,
+     도착 전에 setLevel 이 오면 가다 만 자리에 멈춥니다. */
+  KMap.prototype.setLevel = function (v) {
+    if (this._panTarget) {          // 이동 중에 확대 → 이동이 끊깁니다
+      clearTimeout(this._panTimer);
+      this._panTarget = null;
+    }
+    this._level = v;
+  };
   KMap.prototype.getCenter = function () { return this._center; };
-  KMap.prototype.panTo = function (ll) { this._center = ll; };
-  KMap.prototype.setCenter = function (ll) { this._center = ll; };
+  KMap.prototype.panTo = function (ll) {
+    const self = this;
+    this._panTarget = ll;
+    clearTimeout(this._panTimer);
+    this._panTimer = setTimeout(function () {
+      if (self._panTarget) { self._center = self._panTarget; self._panTarget = null; }
+    }, 0);
+  };
+  KMap.prototype.setCenter = function (ll) {
+    clearTimeout(this._panTimer);
+    this._panTarget = null;
+    this._center = ll;
+  };
   /* ★ setBounds 는 "이 범위가 다 보이게" 이므로 확대가 풀립니다.
      전에는 _bounds 만 적고 _level 을 그대로 뒀는데, 그러면
      "카드를 눌러 확대한 것이 유지되는가" 같은 검사가 헛돕니다 —

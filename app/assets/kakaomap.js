@@ -321,8 +321,7 @@ export function createMap(elId, opts = {}) {
       const hit = markers[id];
       if (!hit) return;
       focused = true;
-      map.panTo(ll(hit.lat, hit.lng));
-      if (map.getLevel() > 5) map.setLevel(5, { animate: true });
+      flyTo(hit.lat, hit.lng);
     },
 
     /* 숙소 카드 선택 → 핀 강조 + 이동 */
@@ -336,8 +335,7 @@ export function createMap(elId, opts = {}) {
       if (!hit) return;
       if (fly) {
         focused = true;
-        map.panTo(ll(hit.lat, hit.lng));
-        if (map.getLevel() > 5) map.setLevel(5, { animate: true });
+        flyTo(hit.lat, hit.lng);
       }
     },
 
@@ -409,6 +407,30 @@ export function createMap(elId, opts = {}) {
       }, 60);
     },
   };
+
+  /* ★ 중심을 먼저 정확히 놓고, 그 다음에 확대합니다.
+
+     전에는 카드를 누르면 이렇게 했습니다.
+
+         map.panTo(목적지);
+         if (map.getLevel() > 5) map.setLevel(5, { animate: true });
+
+     panTo 는 중심을 부드럽게 "옮겨 가는" 동작입니다. 그 움직임이
+     끝나기 전에 setLevel 이 들어오면 이동이 중간에서 끊기고,
+     지도는 목적지가 아니라 가다 만 자리를 중심으로 확대합니다.
+
+     증상이 묘하게 나타납니다 — 이미 확대돼 있으면 setLevel 이
+     아예 안 불려서 멀쩡하고(가까운 카드를 연달아 누를 때), 멀리
+     떨어진 곳을 처음 누를 때만 엉뚱한 데가 확대됩니다.
+
+     setCenter 는 그 자리에서 끝나는 동작이라 끊길 것이 없습니다.
+     부드럽게 미끄러지는 맛은 잃지만, 누른 곳이 아닌 데가 나오는
+     것보다는 낫습니다. 중심을 먼저 맞춰야 확대도 그 점을 기준으로
+     일어납니다. */
+  function flyTo(lat, lng) {
+    map.setCenter(ll(lat, lng));
+    if (map.getLevel() > 5) map.setLevel(5);
+  }
 
   function setBounds(bb) {
     if (!bb) return;

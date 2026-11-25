@@ -240,7 +240,21 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 .layout{display:flex;flex-direction:column;gap:18px}
 
 /* ───────── 지도 ───────── */
-.map-wrap{position:relative}
+
+/* ★ z-index 가 꼭 있어야 합니다 (position:relative 만으로는 모자랍니다).
+
+   지도 위에 떠 있는 범례(.map-legend)는 z-index:400 입니다. 지도
+   타일과 핀보다 위에 있어야 해서 높게 줬습니다.
+
+   그런데 .map-wrap 이 position:relative 만 있고 z-index 가 없으면
+   "쌓임 맥락"을 만들지 않습니다. 그러면 범례의 400 이 지도 안이
+   아니라 페이지 전체에서 겨루고, 위에 붙어 있는 탭(.topbar, z-index:20)
+   보다 높아집니다. 스크롤해서 둘이 겹치는 순간 범례가 숙소·맛집
+   탭을 덮어버립니다.
+
+   z-index 를 주면 .map-wrap 안이 하나의 층이 되고, 그 안의 400 은
+   밖으로 못 나옵니다. 지도 위에 뭘 더 띄워도 같은 일이 안 생깁니다. */
+.map-wrap{position:relative;z-index:0}
 .map{
   height:300px;border:1px solid var(--line);border-radius:var(--r);
   background:var(--surface-2);
@@ -744,17 +758,34 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 /* ───────── 입력 ───────── */
 .field{display:block;margin:0 0 6px;position:relative;border:0;padding:0}
 .field-label{display:block;margin-bottom:6px;font-size:13px;font-weight:600}
+/* ★ 높이를 못박습니다.
+
+   전에는 padding 만 주고 높이는 컨트롤이 알아서 정하게 뒀습니다.
+   그랬더니 한 줄에 나란히 선 칸들이 서로 달라졌습니다 —
+   크롬에서 재보니 인원 48px, 지역 47px, 날짜 50px 이었고,
+   아이폰 사파리에서는 차이가 더 벌어집니다. <select> 와
+   <input type="date"> 는 글자를 담는 방식이 서로 달라서,
+   같은 padding 을 줘도 같은 높이가 나오지 않습니다.
+
+   44px 은 손가락이 누를 수 있는 최소 크기이기도 합니다. */
 .field input,.field select{
-  width:100%;padding:11px 12px;font:inherit;font-size:15px;
+  width:100%;height:48px;padding:0 12px;
+  font:inherit;font-size:15px;line-height:normal;
   color:var(--text);background:var(--bg);
   border:1px solid var(--line-strong);border-radius:10px;
 }
+/* 여러 줄을 받는 칸은 높이를 풀어줍니다 */
+.field textarea{height:auto}
 .field input:focus,.field select:focus{
   outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent);
 }
 .field input[readonly]{background:var(--surface-2);color:var(--muted)}
+/* "명" 같은 꼬리말. 칸 높이가 48px 로 고정됐으니 그 가운데에 맞춥니다.
+   (.field 의 맨 아래가 칸의 맨 아래입니다) */
 .field-suffix{
-  position:absolute;right:12px;bottom:11px;color:var(--muted);font-size:13px;
+  position:absolute;right:12px;bottom:0;height:48px;
+  display:flex;align-items:center;
+  color:var(--muted);font-size:13px;
   pointer-events:none;
 }
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
