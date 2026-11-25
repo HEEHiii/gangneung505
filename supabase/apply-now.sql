@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   아직 안 올린 것 세 개를 하나로 합친 파일입니다.
+   아직 안 올린 SQL 을 하나로 합친 파일입니다.
 
    쓰는 법
      Supabase → SQL Editor → New query → 이 파일 전체 붙여넣기 → Run
@@ -9,10 +9,12 @@
 
    들어 있는 것
      0010  탭 통계 — 어느 탭을 얼마나 쓰는지
-     0011  머문 시간 + 통계는 명단에 있는 사람만 (사장님만)
-     0012  사진을 지우면 파일도 진짜로 지우기
+     0011  머문 시간 + 통계를 볼 사람 명단
+     0012  사진을 지우면 파일도 진짜로 지우기 (이미 올리셨으면 그냥 넘어갑니다)
 
-   ⚠ 0012 는 SQL 만으로 끝나지 않습니다. 아래 "다음" 을 보세요.
+   ⚠ 이것만으로는 통계가 아무에게도 안 보입니다. 명단이 비어 있으니까요.
+     사장님을 명단에 넣는 것은 supabase/make-me-admin.sql 로 따로 합니다.
+     잠긴 쪽이 기본값입니다.
    ══════════════════════════════════════════════════════════════ */
 
 
@@ -167,31 +169,19 @@ create table if not exists app.admins (
 
 alter table app.admins enable row level security;
 
--- 처음 올릴 때 이미 있던 계정을 넣어줍니다.
--- 이 파일을 다시 Run 해도, 명단이 비어 있을 때만 채우므로
--- 나중에 가입한 사람이 슬쩍 관리자가 되지 않습니다.
-insert into app.admins (user_id, note)
-select u.id, '0011 올릴 때 이미 있던 계정'
-  from auth.users u
- where not exists (select 1 from app.admins)
-on conflict (user_id) do nothing;
-
-/*  나중에 직접 넣고 빼려면:
-
-    -- 누가 있는지 보기
-    select u.id, u.email, u.created_at,
-           (a.user_id is not null) as 관리자
-      from auth.users u
-      left join app.admins a on a.user_id = u.id
-     order by u.created_at;
-
-    -- 넣기
-    insert into app.admins (user_id, note) values ('여기에-uuid', '나')
-      on conflict (user_id) do nothing;
-
-    -- 빼기
-    delete from app.admins where user_id = '여기에-uuid';
-*/
+-- ★ 이 파일은 명단을 "비워둔 채로" 끝납니다. 아무도 넣지 않습니다.
+--
+--   전에는 여기서 auth.users 를 통째로 넣었습니다. "어차피 방장은
+--   한 명뿐"이라고 보고 짠 건데, 카카오 로그인을 한 번이라도 한
+--   사람은 전부 관리자가 됩니다. 친구 한 명이 호기심에 로그인해도
+--   그렇게 됩니다. 조건이 하나도 없는 insert 였습니다.
+--
+--   명단이 비면 app.is_admin() 은 모두에게 false 이고,
+--   tab_report 는 아무에게도 숫자를 주지 않습니다. 즉 기본값이
+--   "아무도 못 봄" 입니다. 잠긴 쪽이 기본이어야 안전합니다.
+--
+--   자기를 넣는 것은 supabase/make-me-admin.sql 로 따로 합니다.
+--   사이트 화면에서 자기를 관리자로 만드는 길은 없습니다.
 
 create or replace function app.is_admin()
 returns boolean

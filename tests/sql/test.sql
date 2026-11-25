@@ -1114,6 +1114,40 @@ begin
   perform pg_temp.ok(v_blocked, '로그인 없이는 통계를 못 본다');
 end $$;
 
+-- ★★ 마이그레이션을 막 올린 직후, 명단은 비어 있어야 합니다.
+--
+--    이 줄이 없어서 진짜 버그를 놓쳤습니다. 0011 이 조건 없는
+--    insert ... select from auth.users 로 "그때까지 로그인한 계정
+--    전부"를 관리자로 넣고 있었는데, 바로 아래 검사가 delete 로
+--    명단을 먼저 비우고 시작하는 바람에 통과했습니다.
+--    문(gate)만 재고 기본값을 안 쟀던 것입니다.
+--
+--    지금 이 파일에는 아직 app.admins 에 손댄 곳이 없습니다.
+--    그러니 여기 숫자는 마이그레이션이 넣은 것뿐입니다.
+select pg_temp.ok(
+  (select count(*) from app.admins) = 0,
+  '★ SQL 만 올린 상태에서는 아무도 관리자가 아니다 (기본은 잠김)');
+
+-- ★★★ 위 검사만으로는 부족합니다. 실제로 그걸로는 못 잡았습니다.
+--
+--     이 테스트 DB 는 마이그레이션을 올릴 때 auth.users 가 비어
+--     있습니다. 계정은 그 뒤에 이 파일이 만듭니다. 그래서 조건 없는
+--     insert ... select from auth.users 라도 그 시점엔 0 줄을 넣고,
+--     위 검사는 멀쩡히 통과합니다.
+--
+--     진짜 상황은 반대입니다 — 사장님 DB 에는 카카오 로그인한
+--     계정이 이미 있고, 그 위에 SQL 을 올립니다. 그 순서를 그대로
+--     재현해야 합니다: 계정이 있는 지금, 0011 을 다시 올려봅니다.
+select pg_temp.ok(
+  (select count(*) from auth.users) > 0,
+  '   (지금은 계정이 있다 — 아래 검사가 헛돌지 않는다)');
+
+\ir 0011_tabtime.sql
+
+select pg_temp.ok(
+  (select count(*) from app.admins) = 0,
+  '★★ 계정이 이미 있는 DB 에 0011 을 올려도 관리자는 0명이다');
+
 -- ★ 로그인만으로는 안 됩니다. 명단(app.admins)에 있어야 합니다.
 delete from app.admins;
 do $$
