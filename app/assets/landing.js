@@ -340,11 +340,30 @@ async function showUsage() {
   let rows = [];
   try {
     const me = await currentUser();
-    if (!me) return;                 // 방장이 아니면 보여주지 않습니다
+    if (!me) return;                 // 로그인 안 했으면 보여주지 않습니다
     rows = await tabReport(90);
-  } catch (_) { return; }            // 함수가 없거나 로그인이 끊겼으면 조용히
+  } catch (_) { return; }            // 명단에 없거나 함수가 없으면 조용히
 
-  if (!Array.isArray(rows) || !rows.length) return;
+  /* ★ 여기서 그냥 return 하면 안 됩니다.
+
+     통계는 SQL 을 올린 날부터 쌓입니다. 올린 직후에는 줄이 0개라
+     칸이 통째로 사라지는데, 그러면 "명단에 안 들어갔나? 고장났나?
+     그냥 아직 없는 건가?" 를 구별할 길이 없습니다.
+
+     tab_report 가 예외 없이 돌아왔다는 건 이미 "명단에 있다" 는
+     뜻입니다. 그러니 칸은 띄우고, 비었다고 말해줍니다.
+     칸이 보이면 권한은 통과한 것입니다. */
+  if (!Array.isArray(rows)) rows = [];
+
+  if (!rows.length) {
+    box.hidden = false;
+    list.innerHTML = "";
+    note.textContent =
+      "아직 기록이 없어요. 통계는 SQL 을 올린 날부터 쌓입니다 — " +
+      "방에 들어가서 탭을 눌러보시면 내일부터 여기 나타나요. " +
+      "이 칸이 보인다는 건 보기 권한은 제대로 들어갔다는 뜻이에요.";
+    return;
+  }
 
   const top = Math.max(...rows.map((r) => Number(r.views) || 0), 1);
   const sum = rows.reduce((a, r) => a + (Number(r.views) || 0), 0);
