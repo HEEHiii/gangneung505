@@ -337,11 +337,21 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
   transition:border-color .15s,background .15s;
 }
 .btn-link:hover,.btn-vote:hover{border-color:var(--text)}
-.btn-vote.voted{background:var(--accent);border-color:var(--accent);color:var(--on-dark);font-weight:600}
+/* ★ "투표 / 투표함 ✓" 글자 대신 하트와 숫자.
+
+   글자는 눌린 상태를 읽어야 알 수 있지만, 하트는 채워졌는지로
+   한눈에 보입니다. 숫자도 같이 들어가 있어서 "몇 표인지" 를 따로
+   찾을 필요가 없습니다. */
+.btn-vote{gap:5px;font-weight:700;padding:8px 11px}
+.btn-vote .heart{flex:0 0 auto;transition:fill .15s}
+.btn-vote .vote-count{font-variant-numeric:tabular-nums}
+.btn-vote.voted{
+  background:var(--accent);border-color:var(--accent);color:var(--on-dark);
+}
+.btn-vote.voted .heart{fill:currentColor}
 .btn-vote:disabled{opacity:.45;cursor:default}
 .btn-vote:disabled:hover{border-color:var(--line-strong)}
-.vote-count{font-size:13px;color:var(--muted);margin-left:auto}
-.vote-count strong{color:var(--text);font-size:15px}
+.card-actions .btn-del{margin-left:auto}
 
 /* ───────── 안내 박스 ───────── */
 .note{

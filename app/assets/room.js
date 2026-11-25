@@ -425,9 +425,11 @@ function renderLodgings() {
           ${dists ? `<div class="dists">${dists}</div>` : ""}
           <div class="card-actions">
             ${d.url ? `<a class="btn-link" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">보러가기 ↗</a>` : ""}
-            <button class="btn-vote" type="button" data-vote="${esc(d.id)}"${state.loaded ? "" : " disabled"}>투표</button>
+            <button class="btn-vote" type="button" data-vote="${esc(d.id)}"
+                    aria-label="투표하기" aria-pressed="false"${state.loaded ? "" : " disabled"}>
+              <svg class="heart" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9A5.3 5.3 0 0 1 12 6.6 5.3 5.3 0 0 1 21.5 12c-2 4.4-9.5 9-9.5 9z"></path></svg><span class="vote-count" data-count="${esc(d.id)}">0</span>
+            </button>
             ${canDelete(d.mine) ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
-            <span class="vote-count" data-count="${esc(d.id)}"><strong>0</strong>표</span>
           </div>
           <div class="vote-bar none" data-bar="${esc(d.id)}" aria-hidden="true"><span style="width:0"></span></div>
           ${commentsHtml(d.id)}
@@ -495,9 +497,11 @@ function renderFood() {
             ${d.note ? `<div class="card-note">${esc(d.note)}</div>` : ""}
             <div class="card-actions">
               ${d.url ? `<a class="btn-link" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">보러가기 ↗</a>` : ""}
-              <button class="btn-vote" type="button" data-vote="${esc(d.id)}"${state.loaded ? "" : " disabled"}>투표</button>
+              <button class="btn-vote" type="button" data-vote="${esc(d.id)}"
+                      aria-label="투표하기" aria-pressed="false"${state.loaded ? "" : " disabled"}>
+                <svg class="heart" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9A5.3 5.3 0 0 1 12 6.6 5.3 5.3 0 0 1 21.5 12c-2 4.4-9.5 9-9.5 9z"></path></svg><span class="vote-count" data-count="${esc(d.id)}">0</span>
+              </button>
               ${canDelete(d.mine) ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
-              <span class="vote-count" data-count="${esc(d.id)}"><strong>0</strong>표</span>
             </div>
               <div class="vote-bar none" data-bar="${esc(d.id)}" aria-hidden="true"><span style="width:0"></span></div>
             ${commentsHtml(d.id)}
@@ -620,9 +624,15 @@ async function drawCard() {
   img.src = cardUrl;
   try { await img.decode(); } catch (_) {}
 
-  $("#card-note").textContent = data.points.length
-    ? "장소 이름은 꺼둔 채로 올리는 걸 권해요. 숙소 이름은 켜도 안 나옵니다."
-    : "일정에 좌표가 있는 곳이 없어서 길을 그릴 수 없었어요.";
+  const note = $("#card-note");
+  note.classList.toggle("warn", !tripEnded());
+  note.classList.toggle("strong", !tripEnded());
+  note.innerHTML = !data.points.length
+    ? "일정에 좌표가 있는 곳이 없어서 길을 그릴 수 없었어요."
+    : tripEnded()
+      ? "장소 이름은 꺼둔 채로 올리는 걸 권해요. 숙소 이름은 켜도 안 나옵니다."
+      : "⚠️ <strong>여행이 끝난 뒤에 올리는 걸 권해요.</strong> "
+        + "다녀오기 전에 올리면 <strong>언제 집이 비는지</strong>가 알려져요.";
 }
 
 async function openCard() {
@@ -676,7 +686,7 @@ function paintVotes() {
   state.places.forEach((d) => {
     const n = state.counts[d.id] || 0;
     const el = $(`[data-count="${CSS.escape(d.id)}"]`);
-    if (el) el.innerHTML = `<strong>${n}</strong>표`;
+    if (el) el.textContent = String(n);
 
     const bar = $(`[data-bar="${CSS.escape(d.id)}"]`);
     if (bar) {
@@ -690,8 +700,8 @@ function paintVotes() {
     if (btn) {
       const on = state.mine.includes(d.id);
       btn.classList.toggle("voted", on);
-      btn.textContent = on ? "투표함 ✓" : "투표";
       btn.setAttribute("aria-pressed", String(on));
+      btn.setAttribute("aria-label", on ? "투표 취소" : "투표하기");
     }
   });
 }
@@ -1562,7 +1572,13 @@ function renderPlan() {
 
      여행 전에 동선을 공개하는 건 "언제 집이 비는지" 를 알리는
      일입니다. 사진 탭이 큰 글씨로 말리는 것과 같은 이유입니다. */
-  $("#card-promo").hidden = !(has && tripEnded() && canDraw());
+  /* ★ 여행이 안 끝났어도 보여줍니다.
+
+     전에는 끝난 뒤에만 띄웠는데, 그러면 만들어볼 수조차 없습니다.
+     사진 탭도 "여행 중에는 올리지 마세요" 라고 말릴 뿐 막지는
+     않습니다 — 같은 규칙을 씁니다. 말리는 말은 미리보기 안에
+     둡니다(거기가 올리기 직전입니다). */
+  $("#card-promo").hidden = !(has && canDraw());
   $("#plan-build").textContent = has ? "투표 결과로 다시 짜기" : "투표 결과로 짜기";
 
   if (!has) { box.innerHTML = ""; return; }

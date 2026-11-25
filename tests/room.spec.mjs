@@ -300,18 +300,22 @@ let roomUrl = "";
   const count = () => page.locator("#lodging-list .vote-count").first().textContent();
   const btn = page.locator("#lodging-list [data-vote]").first();
 
-  eq((await count()).trim(), "0표", "처음엔 0표");
-  eq(await btn.textContent(), "투표", "버튼 기본 상태");
+  /* ★ 2026-11: 버튼이 "투표 / 투표함 ✓" 글자에서 하트 + 숫자로
+     바뀌었습니다. 글자는 그때의 모양이고, 지켜야 할 성질은
+     "셈이 맞는가" 와 "눌린 상태가 드러나는가" 입니다. */
+  eq((await count()).trim(), "0", "처음엔 0표");
+  eq(await btn.getAttribute("aria-pressed"), "false", "버튼 기본 상태");
 
   await btn.click();
   await page.waitForTimeout(400);
-  eq((await count()).trim(), "1표", "누르면 1표");
-  eq(await btn.textContent(), "투표함 ✓", "버튼이 바뀐다");
+  eq((await count()).trim(), "1", "누르면 1표");
+  eq(await btn.getAttribute("aria-pressed"), "true", "버튼이 눌린 상태가 된다");
+  eq(await btn.getAttribute("aria-label"), "투표 취소", "읽어주는 말도 바뀐다");
   eq(await btn.getAttribute("aria-pressed"), "true", "스크린리더에도 상태 전달");
 
   await btn.click();
   await page.waitForTimeout(400);
-  eq((await count()).trim(), "0표", "다시 누르면 취소");
+  eq((await count()).trim(), "0", "다시 누르면 취소");
   eq(await btn.getAttribute("aria-pressed"), "false", "상태도 되돌아간다");
 
   /* 새로고침해도 유지 */
@@ -320,8 +324,8 @@ let roomUrl = "";
   await page.reload();
   await page.waitForFunction(() => window.__roomReady === true, { timeout: 8000 });
   await page.waitForTimeout(600);
-  eq((await count()).trim(), "1표", "새로고침해도 투표가 남는다");
-  eq(await page.locator("#lodging-list [data-vote]").first().textContent(), "투표함 ✓",
+  eq((await count()).trim(), "1", "새로고침해도 투표가 남는다");
+  eq(await page.locator("#lodging-list [data-vote]").first().getAttribute("aria-pressed"), "true",
     "내가 한 투표임을 기억한다");
 
   await ctx.close();
@@ -442,7 +446,7 @@ function roomUrlWithHash(current, tab) {
 
   await page.locator("#lodging-list [data-vote]").first().click();
   await page.waitForTimeout(400);
-  eq((await page.locator("#lodging-list .vote-count").first().textContent()).trim(), "1표",
+  eq((await page.locator("#lodging-list .vote-count").first().textContent()).trim(), "1",
     "지도 없이도 투표된다");
 
   /* 이름 검색만 막히고, 친절하게 알려줍니다 */
