@@ -23,7 +23,7 @@ import { searchByKeyword, searchByAddress, looksLikeAddress,
 import { createStore, peekRoom, resumeRoom, setRoomPassword, deleteRoom } from "./store.js";
 import { currentUser } from "./auth.js";
 import { settle } from "./settle.js";
-import { buildItinerary, enumerateDays } from "./route.js";
+import { buildItinerary, enumerateDays, TRANSPORT } from "./route.js";
 import { prepare, prettyBytes, canResize } from "./photo.js";
 import { slugFromUrl, getToken, setToken, clearToken, rememberRoom,
          getNick, setNick } from "./session.js";
@@ -1608,6 +1608,58 @@ function initPlan() {
   renderPlan();
 }
 
+/* ============================================================
+   이동 수단 묻기
+
+   ★ 짤 때마다 묻습니다. 한 번 정해두고 잊으면 수단이 바뀐 뒤에도
+     옛 기준으로 짜입니다. 수단은 시간만이 아니라 하루에 넣는
+     장소 수까지 바꿔서, 틀리면 일정 자체를 못 씁니다.
+
+   ★ 대신 지난번에 고른 것을 미리 골라둡니다. 묻기는 하되
+     보통은 "짜기" 한 번만 누르면 되게요.
+   ============================================================ */
+const MODE_KEY = () => `trip.${slug}.transport`;
+
+function askTransport(hasPlan) {
+  return new Promise((resolve) => {
+    const dlg = $("#plan-mode");
+
+    let last = "car";
+    try { last = localStorage.getItem(MODE_KEY()) || "car"; } catch (_) {}
+    const pick = dlg.querySelector(`input[name="transport"][value="${last}"]`);
+    if (pick) pick.checked = true;
+
+    $("#plan-mode-why").textContent = hasPlan
+      ? "지금 일정을 지우고 새로 짭니다."
+      : "투표 결과로 일정을 짭니다.";
+
+    const done = (val) => {
+      dlg.removeEventListener("close", onClose);
+      $("#plan-mode-form").removeEventListener("submit", onSubmit);
+      $("#pm-cancel").removeEventListener("click", onCancel);
+      if (typeof dlg.close === "function" && dlg.open) dlg.close();
+      else dlg.removeAttribute("open");
+      resolve(val);
+    };
+    const onSubmit = (ev) => {
+      ev.preventDefault();
+      const el = dlg.querySelector('input[name="transport"]:checked');
+      const val = el ? el.value : "car";
+      try { localStorage.setItem(MODE_KEY(), val); } catch (_) {}
+      done(val);
+    };
+    const onCancel = () => done(null);
+    const onClose = () => done(null);          // Esc 로 닫아도 안 짭니다
+
+    $("#plan-mode-form").addEventListener("submit", onSubmit);
+    $("#pm-cancel").addEventListener("click", onCancel);
+    dlg.addEventListener("close", onClose);
+
+    if (typeof dlg.showModal === "function") dlg.showModal();
+    else dlg.setAttribute("open", "");
+  });
+}
+
 async function onBuildPlan() {
   const err = (m) => { $("#plan-error").textContent = m || ""; };
   err("");
@@ -1617,8 +1669,10 @@ async function onBuildPlan() {
     err("먼저 숙소나 맛집을 추가해주세요");
     return;
   }
-  if (state.itinerary.length &&
-      !confirm("지금 일정을 지우고 투표 결과로 새로 짤까요?")) return;
+
+  /* ★ 덮어쓰기 확인도 이 창이 겸합니다. confirm 두 번은 성가십니다 */
+  const transport = await askTransport(state.itinerary.length > 0);
+  if (!transport) return;
 
   const btn = $("#plan-build");
   btn.disabled = true;
@@ -1642,6 +1696,7 @@ async function onBuildPlan() {
       hub,
       lodging,
       places,
+      transport,
     });
 
     const r = await store.itinerarySave(
@@ -1654,7 +1709,12 @@ async function onBuildPlan() {
 
     const notes = [];
     notes.push(usedVotes ? "투표 순위로 짰어요." : "아직 투표가 없어서 추가된 순서로 짰어요.");
-    notes.push(`이동시간 약 ${built.totalMin}분 (직선거리 기준 추정이라 실제와 다를 수 있어요)`);
+    /* ★ 어느 수단으로 짠 건지 적어둡니다. 저장되는 것은 시각뿐이라,
+       이 말이 없으면 나중에 보는 사람은 그 시각이 뭘 타고 간 기준인지
+       알 수 없습니다. */
+    notes.push(
+      `${TRANSPORT[transport].label} 기준 · 이동시간 약 ${built.totalMin}분 ` +
+      "(실제 길찾기가 아니라 거리로 센 어림이라 다를 수 있어요)");
     if (built.warnings.length) notes.push(built.warnings.join(" · "));
     $("#plan-note").textContent = notes.join(" ");
   } catch (e) {

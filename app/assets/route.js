@@ -37,6 +37,57 @@ export const OPTIONS = {
   balance: 25,       // 하루 치가 넘칠 때 1곳당 더하는 가상 비용(분)
 };
 
+/* ============================================================
+   이동 수단
+
+   ★ 전에는 수단과 무관하게 35km/h 하나였습니다. 걸어가도 차로
+     가도 같은 시간이 나왔습니다.
+
+   ★ 바뀌는 것이 시간만이 아닙니다. 뚜벅이 여행에 하루 5곳을
+     넣어주면 시간 숫자가 맞든 틀리든 그 일정은 못 씁니다.
+     그래서 maxPerDay 도 수단을 따릅니다 — 이쪽이 더 크게 틀립니다.
+
+   ★ 이 숫자들은 측정값이 아니라 어림입니다. 실제 길찾기 API 를
+     쓰지 않습니다 (공개 OSRM 을 걷어낸 이유는 이 파일 머리말에).
+     특히 대중교통은 노선이 있고 없고가 커서 오차가 가장 큽니다.
+     화면에서도 "어림"이라고 말합니다.
+
+       kmh      문앞에서 문앞까지 평균 속도 (기다림·주차 포함 아님)
+       detour   직선거리에 곱하는 값. 길이 곧지 않으니까요
+       overhead 구간마다 더하는 고정 시간(분) — 기다리거나 세우는 시간
+   ============================================================ */
+export const TRANSPORT = {
+  /* 자차: 전과 똑같은 값입니다. 35km/h 가 낮아 보이지만 시내 주행에
+     신호·주차·걸어 들어가는 시간이 이미 녹아 있는 수치입니다.
+
+     ★ maxPerDay 를 5 로 올려봤다가 되돌렸습니다. 4일 일정에서
+       빈 날이 생겼습니다 (2/0/2/2). 상한이 느슨해지니 하루 균형을
+       맞추는 쪽이 한 날을 통째로 비워도 되게 됐습니다.
+
+       고쳐야 할 것은 "걸어가는데 차처럼 짜는 것" 이었지 자차가
+       빡빡한 것이 아니었습니다. 이미 맞게 도는 것은 건드리지
+       않습니다. */
+  car:     { label: "자차",     kmh: 35,  detour: 1.35, overhead: 0,  maxPerDay: 4 },
+
+  /* 대중교통: 환승과 기다림이 들어가 평균 속도가 확 떨어집니다.
+     노선이 직선으로 안 가므로 detour 도 큽니다. */
+  transit: { label: "대중교통", kmh: 18,  detour: 1.45, overhead: 15, maxPerDay: 3 },
+
+  /* 도보: 4.2km/h 는 보통 걸음입니다. 길이 곧지 않아도 질러갈 수
+     있어서 detour 는 오히려 작습니다. */
+  walk:    { label: "도보",     kmh: 4.2, detour: 1.25, overhead: 0,  maxPerDay: 3 },
+};
+
+export const DEFAULT_TRANSPORT = "car";
+const modeOf = (m) => TRANSPORT[m] || TRANSPORT[DEFAULT_TRANSPORT];
+
+/* 걸어서 가기엔 먼 구간 — 이것보다 길면 화면에서 말려줍니다 */
+export const WALK_FAR_KM = 4;
+
+/* 이것보다 가까우면 무엇을 타든 걷습니다.
+   버스를 200m 타려고 15분 기다리지는 않으니까요. */
+export const WALK_IT_KM = 0.4;
+
 /* ---------- 시각 ---------- */
 export const toMin = (hhmm) => {
   const [h, m] = String(hhmm).split(":").map(Number);
@@ -49,13 +100,26 @@ export const toHHMM = (min) => {
 };
 
 /* ---------- 이동시간(초) ---------- */
-export function estimateSec(a, b) {
-  const km = distanceKm(a.lat, a.lng, b.lat, b.lng) * 1.35;
-  return Math.max(120, (km / 35) * 3600);
+export function estimateSec(a, b, mode = DEFAULT_TRANSPORT) {
+  const raw = distanceKm(a.lat, a.lng, b.lat, b.lng);
+
+  /* ★ 아주 가까우면 수단을 무시하고 걷습니다.
+
+     이게 없으면 대중교통에서 바로 옆 가게로 옮기는 데도 기다리는
+     15분이 그대로 붙습니다. 200m 를 버스로 가지는 않으니까요.
+
+     ★ 한때 "같은 자리끼리는 0초" 로 바꿨다가 되돌렸습니다.
+       행렬의 대각선은 **빈 날의 비용**으로도 쓰입니다. 0 으로
+       만들었더니 빈 날이 공짜가 돼서, 4일 일정에서 한 날이
+       통째로 비었습니다 (2/0/2/2). 여기서는 걷기 기준 최소값
+       120초가 나오고, 그게 빈 날을 막는 벌점 노릇을 합니다. */
+  const t = modeOf(raw < WALK_IT_KM ? "walk" : mode);
+  const km = raw * t.detour;
+  return Math.max(120, t.overhead * 60 + (km / t.kmh) * 3600);
 }
 
-export function durationMatrix(pts) {
-  return pts.map((a) => pts.map((b) => estimateSec(a, b)));
+export function durationMatrix(pts, mode = DEFAULT_TRANSPORT) {
+  return pts.map((a) => pts.map((b) => estimateSec(a, b, mode)));
 }
 
 /* ---------- 날짜 펼치기 ---------- */
@@ -203,11 +267,15 @@ function mealWindow(kind, clock, A) {
    메인
    ============================================================ */
 export function buildItinerary({
-  days, hub, lodging, places,
+  days, hub, lodging, places = [],
+  transport = DEFAULT_TRANSPORT,
   anchors = {}, options = {},
 } = {}) {
   const A = { ...ANCHORS, ...anchors };
-  const opt = { ...OPTIONS, ...options };
+  /* ★ 하루 장소 수의 기본값은 수단이 정합니다. 그래도 부르는 쪽이
+     options.maxPerDay 를 주면 그쪽이 이깁니다 (검사에서 씁니다). */
+  const T = modeOf(transport);
+  const opt = { ...OPTIONS, maxPerDay: T.maxPerDay, ...options };
   const D = Math.max(1, (days || []).length);
   const warnings = [];
 
@@ -227,7 +295,27 @@ export function buildItinerary({
   const L = lodging ? { ...lodging, kind: "lodging" } : H;
 
   const pts = [H, L, ...places];
-  const M = durationMatrix(pts);
+  const M = durationMatrix(pts, transport);
+
+  /* ★ 걸어서 가기엔 먼 구간이 있으면 말려줍니다.
+
+     시간만 길게 계산해주고 끝내면, 화면에는 "2시간 10분" 이라고
+     적힌 멀쩡해 보이는 일정이 나옵니다. 그걸 보고 진짜 걸으면
+     여행을 망칩니다. 숫자 대신 말로 알려줘야 합니다. */
+  if (transport === "walk") {
+    let farthest = 0;
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        const km = distanceKm(pts[i].lat, pts[i].lng, pts[j].lat, pts[j].lng);
+        if (km > farthest) farthest = km;
+      }
+    }
+    if (farthest > WALK_FAR_KM) {
+      warnings.push(
+        `걸어서 가기엔 먼 구간이 있어요 (가장 먼 두 곳이 ${farthest.toFixed(1)}km). ` +
+        "버스나 택시를 섞는 게 나을 수 있어요");
+    }
+  }
   const S = 0, LG = 1;
   const idx = places.map((_, i) => i + 2);
 
@@ -263,7 +351,8 @@ export function buildItinerary({
     const loose = { ...opt, maxPerDay: idx.length, maxFoodPerDay: idx.length };
     const order = idx.length <= 7 ? idx : nearestThen2opt(M, S, idx);
     split = splitDays(M, order, D, ends, pts, loose);
-    warnings.push(`장소가 많아 하루 ${opt.maxPerDay}곳 규칙을 넘겼어요`);
+    warnings.push(
+      `장소가 많아 ${T.label} 기준 하루 ${opt.maxPerDay}곳 규칙을 넘겼어요`);
   }
 
   /* ---- 시각 붙이기 ---- */

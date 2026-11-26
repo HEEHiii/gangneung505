@@ -572,9 +572,12 @@ console.log("── 일정 탭");
   eq(await page.locator("#plan-empty").isVisible(), true, "처음에는 '아직 일정이 없어요'");
   eq(await page.locator("#plan-share").isVisible(), false, "일정이 없으면 공유 버튼도 숨음");
 
-  /* 장소가 없으면 안내 */
+  /* 장소가 없으면 안내 — 수단을 묻기 전에 걸러야 합니다.
+     아무것도 없는데 "어떻게 다니실 건가요?" 부터 물으면 헛걸음입니다. */
   await page.click("#plan-build");
   await page.waitForTimeout(300);
+  eq(await page.locator("#plan-mode").isVisible(), false,
+    "★ 장소가 없으면 수단을 묻지도 않는다");
   ok((await page.locator("#plan-error").textContent()).includes("추가"),
     "장소가 없으면 먼저 추가하라고 알려줌");
 
@@ -613,16 +616,35 @@ console.log("── 일정 탭");
 
   await page.click('#tabs a[data-tab="plan"]');
   await page.waitForSelector("#panel-plan:not([hidden])", { timeout: 5000 });
+
+  /* ★ 짤 때마다 이동 수단을 묻습니다. 수단에 따라 시간만이 아니라
+     하루에 넣는 장소 수까지 달라집니다. */
+  const build = async (mode) => {
+    await page.click("#plan-build");
+    await page.locator("#plan-mode").waitFor({ state: "visible", timeout: 5000 });
+    await page.check(`#plan-mode input[name="transport"][value="${mode}"]`);
+    await page.click("#pm-go");
+    await page.waitForTimeout(900);
+  };
+
   await page.click("#plan-build");
-  await page.waitForTimeout(900);
+  await page.locator("#plan-mode").waitFor({ state: "visible", timeout: 5000 });
+  ok(true, "★ 짜기를 누르면 이동 수단을 묻는다");
+  await page.click("#pm-cancel");
+  await page.waitForTimeout(200);
+  eq(await page.locator(".plan-day").count(), 0, "   취소하면 안 짠다");
+
+  await build("car");
 
   eq(await page.locator(".plan-day").count(), 3, "3일 여행이면 날짜 칸이 3개");
   eq(await page.locator("#plan-empty").isVisible(), false, "일정이 생기면 안내가 사라짐");
   eq(await page.locator("#plan-share").isVisible(), true, "일정이 생기면 공유 버튼이 보임");
   ok((await page.locator("#plan-note").textContent()).includes("이동시간"),
     "이동시간을 알려줌");
-  ok((await page.locator("#plan-note").textContent()).includes("추정"),
-    "추정값이라고 솔직하게 밝힘");
+  ok((await page.locator("#plan-note").textContent()).includes("어림"),
+    "어림이라고 솔직하게 밝힘");
+  ok((await page.locator("#plan-note").textContent()).includes("자차"),
+    "★ 어느 수단 기준인지 적는다 (저장되는 건 시각뿐이라 이 말이 없으면 알 수 없습니다)");
 
   const firstDay = page.locator(".plan-day").first();
   ok((await firstDay.textContent()).includes("도착"), "첫날은 도착으로 시작");

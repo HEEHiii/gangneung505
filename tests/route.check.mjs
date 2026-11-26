@@ -19,7 +19,10 @@
       전부 손으로 고칩니다. 일정 자동 생성의 가장 큰 제품 리스크입니다.
    ============================================================ */
 
-import { buildItinerary, enumerateDays, toMin, OPTIONS, ANCHORS } from "../app/assets/route.js";
+import {
+  buildItinerary, enumerateDays, toMin, OPTIONS, ANCHORS,
+  estimateSec, TRANSPORT, WALK_FAR_KM,
+} from "../app/assets/route.js";
 
 let fails = 0;
 const ok = (cond, what) => {
@@ -266,6 +269,124 @@ console.log("── 이동시간");
   const two = build("2027-01-23", "2027-01-24").totalMin;
   const four = build("2027-01-23", "2027-01-26").totalMin;
   ok(four >= two, `날이 늘면 이동시간이 줄지 않는다  (${two}분 → ${four}분)`);
+}
+
+/* ============================================================
+   10. 이동 수단
+
+   ★ 전에는 수단과 무관하게 35km/h 하나였습니다. 걸어가도 차로
+     가도 같은 시간이 나왔습니다.
+
+   ★ 더 크게 틀리는 쪽은 시간이 아니라 하루 장소 수입니다.
+     뚜벅이 여행에 하루 5곳을 넣어주면, 시간 숫자가 맞든 틀리든
+     그 일정은 못 씁니다.
+   ============================================================ */
+console.log("── 이동 수단");
+{
+  const A = { lat: 37.7639, lng: 128.8990 };   // 강릉역
+  const B = { lat: 37.7955, lng: 128.8963 };   // 경포대 (약 3.5km)
+
+  const car = estimateSec(A, B, "car");
+  const transit = estimateSec(A, B, "transit");
+  const walk = estimateSec(A, B, "walk");
+
+  ok(walk > transit && transit > car,
+    `같은 구간이 도보 > 대중교통 > 자차  (${Math.round(walk / 60)}분 / ` +
+    `${Math.round(transit / 60)}분 / ${Math.round(car / 60)}분)`);
+
+  /* ★ 걸어서 3.5km 면 40분쯤이어야 말이 됩니다. 전에는 6분이었습니다 */
+  ok(walk / 60 > 30 && walk / 60 < 90,
+    `★ 3.5km 를 걷는 시간이 말이 된다  (${Math.round(walk / 60)}분)`);
+
+  /* ★ 아주 가까우면 수단을 무시하고 걷습니다.
+     이게 없으면 대중교통에서 바로 옆 가게로 가는 데도 기다리는
+     15분이 그대로 붙습니다. */
+  const next = { lat: 37.7639, lng: 128.9010 };   // 약 170m
+  eq(estimateSec(A, next, "transit"), estimateSec(A, next, "walk"),
+    "바로 옆이면 대중교통이어도 걷기로 친다");
+  ok(estimateSec(A, next, "transit") < 5 * 60,
+    `   그래서 170m 가 5분 안쪽  (${Math.round(estimateSec(A, next, "transit") / 60)}분)`);
+
+  /* ★★ 같은 자리끼리는 0 이 아니라 최소값이어야 합니다.
+
+     행렬의 대각선은 **빈 날의 비용**으로도 쓰입니다. 0 으로
+     바꿨더니 빈 날이 공짜가 돼서 4일 일정의 한 날이 통째로
+     비었습니다 (2/0/2/2). 위의 "빈 날이 없다" 검사가 그걸
+     잡아줬습니다. */
+  ok(estimateSec(A, A, "transit") > 0, "같은 자리끼리도 0 은 아니다 (빈 날 벌점)");
+
+  /* 모르는 수단은 자차로 떨어집니다 (화면이 깨지지 않게) */
+  eq(estimateSec(A, B, "비행기"), car, "모르는 수단이면 자차 기준");
+  eq(estimateSec(A, B), car, "안 적으면 자차 기준");
+
+  /* ★★ 하루에 넣는 장소 수가 수단을 따른다
+
+     ★ 처음에는 3일짜리로 쟀는데 그게 틀렸습니다. 6곳을 3일에
+       나누면 하루 2곳씩이라 자차 상한(5곳)이 애초에 안 걸립니다.
+       상한이 실제로 일하는지 보려면 하루에 다 몰아야 합니다.
+
+     그리고 걸어 다닐 수 있을 만큼 모아 둡니다. 멀리 흩어져 있으면
+     상한이 아니라 시간이 먼저 막아서, 무엇이 막았는지 알 수 없습니다. */
+  const TIGHT_HUB = { name: "강릉역", lat: 37.7639, lng: 128.8990 };
+  const TIGHT = [
+    { id: "t1", name: "가까운 밥집", lat: 37.7650, lng: 128.9000, kind: "food" },
+    { id: "t2", name: "가까운 카페", lat: 37.7660, lng: 128.9010, kind: "cafe" },
+    { id: "t3", name: "가까운 공원", lat: 37.7645, lng: 128.9020, kind: "spot" },
+    { id: "t4", name: "가까운 전시", lat: 37.7630, lng: 128.8980, kind: "spot" },
+    { id: "t5", name: "가까운 저녁", lat: 37.7655, lng: 128.8975, kind: "food" },
+    { id: "t6", name: "가까운 서점", lat: 37.7625, lng: 128.9005, kind: "spot" },
+  ];
+  const oneDay = (transport, places) => buildItinerary({
+    days: enumerateDays("2027-01-23", "2027-01-23"),   // 당일치기
+    hub: TIGHT_HUB, lodging: null, places, transport,
+  });
+  const placed = (r) => r.itinerary.reduce((n, d) => n + placeSlots(d).length, 0);
+  const overflowed = (r) => r.warnings.some((w) => w.includes("규칙을 넘겼"));
+
+  /* ★ 상한은 무른 규칙입니다.
+
+     처음에 6곳을 하루에 넣고 "상한이 안 걸린다" 고 빨개졌는데,
+     그건 제 검사가 틀린 것이었습니다. route.js 는 상한 때문에 다
+     못 담으면 상한을 풀고 전부 넣은 뒤 경고합니다 — 투표로 뽑힌
+     곳을 말없이 버리는 것보다 낫다는 판단이고, 맞는 판단입니다.
+
+     그래서 재야 할 성질은 "넘지 않는다" 가 아니라
+     "같은 장소 수에서 수단에 따라 경고가 갈린다" 입니다.
+     4곳이면 자차(5)는 넉넉하고 도보(3)는 넘칩니다. */
+  const FOUR = TIGHT.slice(0, 4);
+
+  const car4 = oneDay("car", FOUR);
+  const walk4 = oneDay("walk", FOUR);
+
+  eq(placed(car4), 4, "자차로 4곳은 하루에 들어간다");
+  ok(!overflowed(car4), `   자차(하루 ${TRANSPORT.car.maxPerDay}곳)는 넉넉해서 말이 없다`);
+  ok(overflowed(walk4),
+    `★★ 같은 4곳이 도보(하루 ${TRANSPORT.walk.maxPerDay}곳)에서는 무리라고 말해준다` +
+    `  (${walk4.warnings.join(" / ")})`);
+
+  /* 넘쳐도 장소를 버리지는 않습니다 — 버리면 투표가 사라집니다 */
+  eq(placed(walk4), 4, "   무리라고 말하되 장소를 버리지는 않는다");
+
+  /* 상한 안쪽이면 도보도 조용합니다 */
+  ok(!overflowed(oneDay("walk", TIGHT.slice(0, 3))),
+    `   도보도 ${TRANSPORT.walk.maxPerDay}곳까지는 조용하다`);
+
+  /* ★ 걸어서 가기엔 먼 구간은 숫자 말고 말로 알려줍니다.
+     "2시간 10분" 이라고만 적힌 멀쩡해 보이는 일정을 보고 진짜
+     걸으면 여행을 망칩니다. */
+  const far = buildItinerary({
+    days: enumerateDays("2027-01-23", "2027-01-25"),
+    hub: HUB, lodging: LODGING, places: PLACES, transport: "walk",
+  });
+  ok(far.warnings.some((w) => w.includes("걸어서")),
+    `★ 먼 구간이 있으면 걸어가지 말라고 말해준다  (${far.warnings.join(" / ")})`);
+
+  /* 모아 둔 곳끼리면 그 말은 안 나와야 합니다.
+     ★ 숙소와 출발지도 거리 계산에 들어갑니다 — 걸어 다니는데
+       숙소가 5km 밖이면 그것부터 문제니까요. 그래서 이 묶음은
+       숙소 없이(당일치기) 둡니다. */
+  ok(!oneDay("walk", TIGHT).warnings.some((w) => w.includes("걸어서")),
+    `   모여 있으면 그 말은 안 한다  (가장 먼 곳도 ${WALK_FAR_KM}km 안)`);
 }
 
 console.log("");
