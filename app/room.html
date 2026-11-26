@@ -285,14 +285,28 @@
        목록을 다시 그리는데, 폼이 그 안에 있으면 쓰던 글이 날아갑니다. -->
   <dialog id="place-edit" class="dlg">
     <form class="dlg-box" id="place-edit-form">
-      <h2 class="dlg-title" id="place-edit-title">고치기</h2>
+      <h2 class="dlg-title" id="place-edit-title">수정</h2>
 
       <label class="field">
         <span class="field-label">이름</span>
         <input id="pe-name" maxlength="80" required>
       </label>
 
-      <div class="field-row">
+      <!-- ───── 맛집 탭에서만 — 식당인지 카페인지 ─────
+           이름으로 검색해 추가하면 셋 중 뭔지 모르는 채로 들어옵니다.
+           그걸 바로잡는 자리입니다. 숙소는 바꿀 것이 없어서 숨깁니다. -->
+      <label class="field" id="pe-kind-row" hidden>
+        <span class="field-label">분류</span>
+        <select id="pe-kind">
+          <option value="food">식당</option>
+          <option value="cafe">카페</option>
+          <option value="spot">관광</option>
+        </select>
+      </label>
+
+      <!-- ───── 숙소 탭에서만 ─────
+           맛집에 "1박 가격" 을 물어볼 이유가 없습니다. -->
+      <div class="field-row" id="pe-stay-row" hidden>
         <label class="field">
           <span class="field-label">1박 가격</span>
           <input id="pe-price" type="number" inputmode="numeric" min="0" placeholder="비워도 돼요">

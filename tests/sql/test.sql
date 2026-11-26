@@ -344,6 +344,52 @@ select pg_temp.ok(
   '빈 값을 보내면 비워진다 (안 보낸 것과 구별된다)');
 set role anon;
 
+/* ★★ 분류 바꾸기 (0014)
+
+   맛집 탭 안에서는 자유롭게, 숙소와 그 나머지 사이로는 못 넘습니다.
+   place1 은 숙소라서 맛집으로 못 바꿔야 합니다. */
+select pg_temp.must_fail(
+  format($$ select public.place_edit(%L, 'voter-A', %L, '{"kind":"food"}'::jsonb) $$,
+    (select v::jsonb ->> 'token' from t where k = 'tok1'),
+    (select v::jsonb ->> 'id' from t where k = 'place1')),
+  '[denied]', '★ 숙소를 맛집으로는 못 옮김 (탭이 다르면 표의 뜻이 다릅니다)');
+
+select pg_temp.must_fail(
+  format($$ select public.place_edit(%L, 'voter-A', %L, '{"kind":"술집"}'::jsonb) $$,
+    (select v::jsonb ->> 'token' from t where k = 'tok1'),
+    (select v::jsonb ->> 'id' from t where k = 'place1')),
+  '[invalid]', '모르는 분류는 거부');
+
+-- 맛집 하나를 넣고 식당 → 카페로 바꿔봅니다
+insert into t select 'food1', (public.place_add(
+  (select v::jsonb ->> 'token' from t where k = 'tok1'), 'voter-A',
+  '{"kind":"food","name":"테라로사","lat":37.7390,"lng":128.8760,"source":"link"}'::jsonb))::text;
+
+insert into t select 'ed5', (public.place_edit(
+  (select v::jsonb ->> 'token' from t where k = 'tok1'), 'voter-A',
+  (select (v::jsonb ->> 'id')::uuid from t where k = 'food1'),
+  '{"kind":"cafe"}'::jsonb))::text;
+
+reset role;
+select pg_temp.ok(
+  (select kind from app.places
+    where id = (select (v::jsonb ->> 'id')::uuid from t where k = 'food1')) = 'cafe',
+  '★ 같은 탭 안에서는 식당 → 카페로 바뀐다');
+set role anon;
+
+-- 맛집도 숙소로는 못 넘습니다 (반대 방향)
+select pg_temp.must_fail(
+  format($$ select public.place_edit(%L, 'voter-A', %L, '{"kind":"lodging"}'::jsonb) $$,
+    (select v::jsonb ->> 'token' from t where k = 'tok1'),
+    (select v::jsonb ->> 'id' from t where k = 'food1')),
+  '[denied]', '   반대로 맛집을 숙소로도 못 옮김');
+
+/* 검사용으로 넣은 맛집은 치웁니다 — 뒤의 스냅샷 검사가 "장소 1곳"
+   을 세고 있어서, 안 치우면 엉뚱한 자리에서 빨개집니다. */
+insert into t select 'rm1', (public.place_remove(
+  (select v::jsonb ->> 'token' from t where k = 'tok1'), 'voter-A',
+  (select (v::jsonb ->> 'id')::uuid from t where k = 'food1')))::text;
+
 -- 원래대로 되돌려 둡니다 (뒤 검사들이 이 장소를 그대로 씁니다)
 insert into t select 'ed4', (public.place_edit(
   (select v::jsonb ->> 'token' from t where k = 'tok1'), 'voter-A',

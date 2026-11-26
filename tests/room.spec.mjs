@@ -897,6 +897,49 @@ console.log("── 카드 고치기");
   await page.waitForTimeout(200);
   ok((await card().textContent()).includes("오붓한 강릉"), "취소하면 그대로다");
 
+  /* ★★ 맛집은 식당인지 카페인지 고칠 수 있어야 합니다.
+
+     이 기능이 생긴 진짜 이유입니다. 이름으로 검색해서 추가하면
+     식당·카페·관광 중 뭔지 모르는 채로 들어옵니다.
+
+     반대로 "1박 가격" 은 맛집에 물어볼 것이 아닙니다. 숨긴 칸을
+     같이 보내면 place_edit 가 그 빈 값으로 멀쩡한 값을 지웁니다. */
+  await page.click('#tabs a[data-tab="food"]');
+  await page.waitForTimeout(300);
+
+  const foodBox = "#adder-food";
+  if (!(await page.locator(`${foodBox} .a-q`).isVisible())) {
+    await page.click(`${foodBox} summary`);
+    await page.locator(`${foodBox} .a-q`).waitFor({ state: "visible", timeout: 5000 });
+  }
+  await page.fill(`${foodBox} .a-q`, "https://map.kakao.com/link/map/테라로사,37.7390,128.8760");
+  await page.click(`${foodBox} .a-find`);
+  await page.waitForTimeout(700);
+
+  const fcard = () => page.locator("#food-list .card", { hasText: "테라로사" });
+  await fcard().locator("[data-edit]").click();
+  await page.locator("#place-edit").waitFor({ state: "visible", timeout: 5000 });
+
+  ok(await page.locator("#pe-kind-row").isVisible(), "★ 맛집에는 분류 칸이 나온다");
+  eq(await page.locator("#pe-stay-row").isVisible(), false,
+    '★ 맛집에는 "1박 가격" 이 안 나온다');
+
+  await page.selectOption("#pe-kind", "cafe");
+  await page.click("#pe-save");
+  await page.waitForTimeout(600);
+
+  ok((await fcard().textContent()).includes("카페"), "★ 식당을 카페로 고칠 수 있다");
+
+  /* 숙소는 반대 — 가격은 나오고 분류는 안 나옵니다 */
+  await page.click('#tabs a[data-tab="stay"]');
+  await page.waitForTimeout(300);
+  await card().locator("[data-edit]").click();
+  await page.locator("#place-edit").waitFor({ state: "visible", timeout: 5000 });
+  ok(await page.locator("#pe-stay-row").isVisible(), "숙소에는 1박 가격이 나온다");
+  eq(await page.locator("#pe-kind-row").isVisible(), false, "   숙소에는 분류 칸이 없다");
+  eq(await page.inputValue("#pe-price"), "180000", "   아까 넣은 가격이 그대로다");
+  await page.click("#pe-cancel");
+
   eq(errors.length, 0, `콘솔 오류 없음${errors.length ? " — " + errors[0] : ""}`);
   await ctx.close();
 }

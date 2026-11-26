@@ -367,6 +367,8 @@ export function createStore(slug) {
          반대로 빈 문자열을 보내면 "비우기" 가 됩니다. */
     async placeEdit(id, data) {
       const clean = {};
+      /* 분류는 같은 탭 안에서만 바뀝니다 — 선은 서버가 긋습니다 (0014) */
+      if ("kind" in data) clean.kind = String(data.kind || "");
       if ("name" in data) clean.name = String(data.name || "").trim().slice(0, 80);
       if ("note" in data) clean.note = String(data.note || "").slice(0, 300);
       if ("url" in data) clean.url = String(data.url || "").trim().slice(0, 500);
@@ -387,6 +389,18 @@ export function createStore(slug) {
         if (!p) throw new RpcError("denied", "없는 장소예요", "miss");
         if (!canDropLocal(p.created_by)) {
           throw new RpcError("denied", "직접 추가한 곳만 고칠 수 있어요", "not mine");
+        }
+        /* 서버가 긋는 선을 여기서도 그어야 합니다 — 안 그러면
+           "이 브라우저에만 저장" 모드에서만 숙소가 맛집이 됩니다 */
+        if ("kind" in clean) {
+          if (!["lodging", "food", "cafe", "spot"].includes(clean.kind)) {
+            throw new RpcError("invalid", "모르는 분류예요", clean.kind);
+          }
+          if ((p.kind === "lodging") !== (clean.kind === "lodging")) {
+            throw new RpcError("denied",
+              "숙소와 맛집 사이로는 못 옮겨요. 지우고 다시 넣어주세요", "cross tab");
+          }
+          p.kind = clean.kind;
         }
         if ("name" in clean) p.name = clean.name;
         if ("note" in clean) p.note = clean.note || null;

@@ -429,7 +429,7 @@ function renderLodgings() {
                     aria-label="투표하기" aria-pressed="false"${state.loaded ? "" : " disabled"}>
               <svg class="heart" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9A5.3 5.3 0 0 1 12 6.6 5.3 5.3 0 0 1 21.5 12c-2 4.4-9.5 9-9.5 9z"></path></svg><span class="vote-count" data-count="${esc(d.id)}">0</span>
             </button>
-            ${canDelete(d.mine) ? `<button class="btn-quiet btn-edit" type="button" data-edit="${esc(d.id)}" aria-label="${esc(d.name)} 고치기">고치기</button>` : ""}
+            ${canDelete(d.mine) ? `<button class="btn-quiet btn-edit" type="button" data-edit="${esc(d.id)}" aria-label="${esc(d.name)} 수정">수정</button>` : ""}
             ${canDelete(d.mine) ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
           </div>
           <div class="vote-bar none" data-bar="${esc(d.id)}" aria-hidden="true"><span style="width:0"></span></div>
@@ -502,7 +502,7 @@ function renderFood() {
                       aria-label="투표하기" aria-pressed="false"${state.loaded ? "" : " disabled"}>
                 <svg class="heart" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9A5.3 5.3 0 0 1 12 6.6 5.3 5.3 0 0 1 21.5 12c-2 4.4-9.5 9-9.5 9z"></path></svg><span class="vote-count" data-count="${esc(d.id)}">0</span>
               </button>
-              ${canDelete(d.mine) ? `<button class="btn-quiet btn-edit" type="button" data-edit="${esc(d.id)}" aria-label="${esc(d.name)} 고치기">고치기</button>` : ""}
+              ${canDelete(d.mine) ? `<button class="btn-quiet btn-edit" type="button" data-edit="${esc(d.id)}" aria-label="${esc(d.name)} 수정">수정</button>` : ""}
               ${canDelete(d.mine) ? `<button class="btn-del" type="button" data-del="${esc(d.id)}" aria-label="${esc(d.name)} 삭제">삭제</button>` : ""}
             </div>
               <div class="vote-bar none" data-bar="${esc(d.id)}" aria-hidden="true"><span style="width:0"></span></div>
@@ -759,6 +759,14 @@ async function onVote(id) {
      어긋나기 쉽고, 제대로 하려면 지도에서 찍는 화면이 따로
      있어야 합니다. 장소 자체가 다르면 지우고 다시 넣는 게 맞습니다
      — 그때는 투표가 사라지는 것도 맞고요. 다른 곳이니까요.
+
+   ★ 분류는 같은 탭 안에서만 바꿉니다 (0014).
+     이름으로 검색해 맛집을 추가하면 식당인지 카페인지 모르는 채로
+     들어옵니다. 그걸 바로잡는 것이 이 기능이 생긴 이유입니다.
+     넘지 못하는 선은 숙소 ↔ 나머지 하나뿐입니다.
+
+   ★ 보여주는 칸도 분류를 따릅니다.
+     맛집에 "1박 가격" 을 물어볼 이유가 없습니다.
    ============================================================ */
 let editingId = null;
 
@@ -766,13 +774,23 @@ function openEdit(id, label) {
   const item = state.places.find((x) => x.id === id);
   if (!item) return;
 
+  const isStay = item.kind === "lodging";
+
   editingId = id;
-  $("#place-edit-title").textContent = `${label} 고치기`;
+  $("#place-edit-title").textContent = `${label} 수정`;
   $("#pe-name").value = item.name || "";
-  $("#pe-price").value = item.price == null ? "" : String(item.price);
-  $("#pe-capacity").value = item.capacity || "";
   $("#pe-note").value = item.note || "";
   $("#pe-url").value = item.url || "";
+
+  $("#pe-stay-row").hidden = !isStay;
+  $("#pe-kind-row").hidden = isStay;
+  if (isStay) {
+    $("#pe-price").value = item.price == null ? "" : String(item.price);
+    $("#pe-capacity").value = item.capacity || "";
+  } else {
+    $("#pe-kind").value = item.kind || "food";
+  }
+
   $("#pe-err").hidden = true;
   $("#pe-save").disabled = false;
 
@@ -791,13 +809,25 @@ async function saveEdit() {
   const id = editingId;
   if (!id) return;
 
+  /* ★ 보이는 칸만 보냅니다.
+
+     place_edit 는 "보낸 칸만 고치고 안 보낸 칸은 그대로 둡니다".
+     그래서 숨긴 칸을 같이 보내면, 맛집을 고칠 때 빈 가격칸이
+     따라가서 멀쩡한 값을 지워버립니다. */
+  const item = state.places.find((x) => x.id === id);
+  const isStay = item && item.kind === "lodging";
+
   const data = {
     name: $("#pe-name").value.trim(),
-    price: $("#pe-price").value.trim(),
-    capacity: $("#pe-capacity").value.trim(),
     note: $("#pe-note").value.trim(),
     url: $("#pe-url").value.trim(),
   };
+  if (isStay) {
+    data.price = $("#pe-price").value.trim();
+    data.capacity = $("#pe-capacity").value.trim();
+  } else {
+    data.kind = $("#pe-kind").value;
+  }
 
   const err = $("#pe-err");
   if (!data.name) {
@@ -807,15 +837,21 @@ async function saveEdit() {
     return;
   }
 
-  /* 먼저 화면에 반영하고, 실패하면 되돌립니다 (투표·삭제와 같은 방식) */
+  /* 먼저 화면에 반영하고, 실패하면 되돌립니다 (투표·삭제와 같은 방식)
+
+     ★ 보낸 칸만 손댑니다. 전에는 data.price 를 무조건 읽었는데,
+       맛집에는 그 칸이 아예 없어서 Number(undefined) = NaN 이
+       카드에 박혔습니다. 서버로 보내는 규칙과 화면에 반영하는
+       규칙이 같아야 합니다. */
   const before = state.places.map((x) => ({ ...x }));
   const row = state.places.find((x) => x.id === id);
   if (row) {
     row.name = data.name;
-    row.price = data.price === "" ? null : Number(data.price);
-    row.capacity = data.capacity || null;
     row.note = data.note || null;
     row.url = data.url || null;
+    if ("kind" in data) row.kind = data.kind;
+    if ("price" in data) row.price = data.price === "" ? null : Number(data.price);
+    if ("capacity" in data) row.capacity = data.capacity || null;
   }
   closeEdit();
   redrawAll();
