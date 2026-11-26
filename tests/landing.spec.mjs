@@ -647,11 +647,28 @@ console.log("── 테마 고르기 탭 영역");
     ok(title && title.length > 1, `${name} — 제목이 있다  (${title})`);
   }
 
-  /* 그림 파일이 실제로 있는지 */
-  const res = await page.goto(`${BASE}/app/assets/brand/og.png`);
-  eq(res.status(), 200, "★ 미리보기 그림 파일이 실제로 있다");
+  /* ★ 그림 파일이 실제로 있는지 — 주소만 맞고 파일이 없으면
+     브라우저로는 모르고 카톡에서만 빈 카드가 뜹니다. */
+  for (const f of ["og.png", "og-invite.png"]) {
+    const res = await page.goto(`${BASE}/app/assets/brand/${f}`);
+    eq(res.status(), 200, `★ ${f} 파일이 실제로 있다`);
+  }
 
+  /* ★★ 첫 화면과 방 링크는 다른 그림을 써야 합니다.
+
+     카톡에서 뜨는 상황이 다릅니다 — 하나는 "이런 서비스가 있다",
+     다른 하나는 "너 초대했어" 입니다. 같은 그림이면 받는 쪽이
+     광고로 보고 넘깁니다.
+
+     그림 파일을 바꾸다 한쪽만 고치면 다시 같아지므로 여기서 잽니다. */
+  await page.goto(`${BASE}/app/index.html`);
+  const homeImg = await page.getAttribute('meta[property="og:image"]', "content");
   await page.goto(`${BASE}/app/room.html`);
+  const roomImg = await page.getAttribute('meta[property="og:image"]', "content");
+  ok(homeImg !== roomImg,
+    `★ 첫 화면과 방 링크가 다른 그림을 쓴다  (${String(roomImg).split("/").pop()})`);
+  ok(/invite/.test(String(roomImg)), "   방 링크 쪽이 초대용 그림이다");
+
   const roomTitle = await page.getAttribute('meta[property="og:title"]', "content");
   const roomDesc = await page.getAttribute('meta[property="og:description"]', "content");
   ok(!/강릉|여행 이름|\{/.test(`${roomTitle} ${roomDesc}`),

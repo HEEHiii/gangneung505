@@ -283,9 +283,18 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 .map-legend button.on{background:var(--text);color:var(--on-dark);font-weight:600}
 .map-hint{margin-top:8px}
 
-/* 핀 */
+/* 핀
+
+   ★ border-radius 는 왼쪽위 · 오른쪽위 · 오른쪽아래 · 왼쪽아래 순입니다.
+     전에는 `50% 50% 50% 2px` 라서 **왼쪽 아래**가 뾰족했고, 거기에
+     45도를 돌리니 뾰족한 끝이 왼쪽을 향했습니다 — 핀이 옆으로
+     누운 것처럼 보였습니다.
+
+     뾰족한 쪽을 **오른쪽 아래**(`2px` 를 셋째 자리로)로 옮기면
+     같은 45도에서 끝이 아래를 향합니다. 안쪽 글자의 되돌림
+     회전(-45deg)은 그대로 둬도 맞습니다. */
 .pin-lodging{
-  width:28px;height:28px;border-radius:50% 50% 50% 2px;
+  width:28px;height:28px;border-radius:50% 50% 2px 50%;
   transform:rotate(45deg);
   background:var(--accent);border:2px solid var(--pin-ring);
   box-shadow:var(--shadow-lg);
@@ -300,7 +309,7 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 }
 /* 맛집 탭 핀 — 식당은 채움, 카페는 테두리만 (색 말고 모양으로도 구분) */
 .pin-food{
-  width:20px;height:20px;border-radius:50% 50% 50% 2px;
+  width:20px;height:20px;border-radius:50% 50% 2px 50%;
   transform:rotate(45deg);
   background:var(--accent);border:2px solid var(--pin-ring);
   box-shadow:var(--shadow-lg);
@@ -510,7 +519,7 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
 .leaflet-container.picking{cursor:crosshair}
 .leaflet-container.picking .leaflet-marker-icon{cursor:crosshair}
 .pin-pick{
-  width:26px;height:26px;border-radius:50% 50% 50% 2px;
+  width:26px;height:26px;border-radius:50% 50% 2px 50%;
   transform:rotate(45deg);
   background:var(--pin-fill);border:3px solid var(--danger);
   box-shadow:var(--shadow-xl);
