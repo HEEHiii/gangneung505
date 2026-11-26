@@ -139,7 +139,7 @@ const FRIENDLY = {
   unknown: "문제가 생겼어요. 잠시 뒤에 다시 시도해주세요.",
 };
 
-export function toRpcError(err) {
+export function toRpcError(err, fn) {
   const raw = String((err && err.message) || err || "");
 
   const m = raw.match(/^\s*\[(\w+)\]\s*(.*)$/);
@@ -149,11 +149,30 @@ export function toRpcError(err) {
   if (/permission denied/i.test(raw)) {
     return new RpcError("denied", "이 동작을 할 권한이 없어요.", raw);
   }
-  // 함수 이름·인자가 어긋날 때 — 개발 중에만 나야 하는 오류입니다
+
+  /* ★ 함수가 서버에 아예 없을 때.
+
+     전에는 "서버와 화면의 버전이 맞지 않아요. 새로고침해도 안 되면
+     알려주세요" 라고 했습니다. 두 가지가 틀렸습니다.
+
+     ① 새로고침으로는 절대 안 고쳐집니다. 화면이 아니라 DB 에
+        함수가 없는 것이니까요.
+     ② 주석에 "개발 중에만 나야 하는 오류" 라고 적어뒀는데,
+        이 프로젝트는 SQL 을 사람이 손으로 올립니다. 코드는
+        GitHub 에 올리면 바로 배포되지만 SQL 은 안 그렇습니다.
+        그래서 "사이트가 DB 보다 앞선 상태" 는 고장이 아니라
+        흔한 중간 단계입니다.
+
+     할 일을 그대로 적어줍니다. 어느 함수가 없는지도 같이요 —
+     그래야 어느 SQL 을 올려야 하는지 찾을 수 있습니다. */
   if (/Could not find the function|PGRST202/i.test(raw)) {
+    const which = fn ? ` (${fn})` : "";
     return new RpcError("contract",
-      "서버와 화면의 버전이 맞지 않아요. 새로고침해도 안 되면 알려주세요.", raw);
+      `이 기능의 SQL 이 아직 서버에 없어요${which}. ` +
+      "Supabase → SQL Editor 에서 supabase/apply-now.sql 을 한 번 돌려주세요.",
+      raw);
   }
+
   if (/Failed to fetch|NetworkError|aborted|timeout/i.test(raw)) {
     return new RpcError("net", FRIENDLY.net, raw);
   }
@@ -202,10 +221,10 @@ export async function rpc(fn, args = {}) {
       timer = setTimeout(() => rej(new Error("timeout")), TIMEOUT);
     });
     const { data, error } = await Promise.race([call, timeout]);
-    if (error) throw toRpcError(error);
+    if (error) throw toRpcError(error, fn);
     return data;
   } catch (e) {
-    throw e instanceof RpcError ? e : toRpcError(e);
+    throw e instanceof RpcError ? e : toRpcError(e, fn);
   } finally {
     clearTimeout(timer);
   }
