@@ -657,6 +657,47 @@ console.log("── 일정 탭");
     ok(all.includes(n), `${n} 이 일정에 들어감`);
   }
 
+  /* ★ 시간이 카드 왼쪽 끝에 붙어 있지 않아야 합니다.
+
+     .plan-slots 선택자가 두 번 있었고 뒤엣것의 padding:0 이
+     이겨서 여백이 죽어 있었습니다. 두 줄 떨어져 있어서 눈으로는
+     안 보였습니다 — 숫자로 잽니다. */
+  {
+    const time = await page.locator(".plan-time").first().boundingBox();
+    const day = await page.locator(".plan-day").first().boundingBox();
+    const gap = time.x - day.x;
+    ok(gap >= 8, `★ 시간이 카드 왼쪽에 붙어 있지 않다  (${gap.toFixed(0)}px 띄움)`);
+  }
+
+  /* ★★ 시간을 손으로 고칠 수 있어야 합니다.
+
+     짜준 시간은 어림입니다. 기차 시간이나 체크인 시간처럼 정해진
+     것이 있으면 그쪽이 맞습니다. */
+  {
+    const first = page.locator(".plan-day").first().locator(".plan-time").first();
+    const was = (await first.textContent()).trim();
+
+    page.once("dialog", (d) => d.accept("07:05"));
+    await first.click();
+    await page.waitForTimeout(700);
+    eq((await page.locator(".plan-day").first().locator(".plan-time").first()
+         .textContent()).trim(), "07:05", `★ 시간을 고칠 수 있다  (${was} → 07:05)`);
+
+    /* 잘못 적으면 말해주고 그대로 둡니다 */
+    page.once("dialog", (d) => d.accept("아무거나"));
+    await page.locator(".plan-day").first().locator(".plan-time").first().click();
+    await page.waitForTimeout(500);
+    eq((await page.locator(".plan-day").first().locator(".plan-time").first()
+         .textContent()).trim(), "07:05", "   잘못 적으면 안 바꾼다");
+
+    /* 취소하면 그대로 */
+    page.once("dialog", (d) => d.dismiss());
+    await page.locator(".plan-day").first().locator(".plan-time").first().click();
+    await page.waitForTimeout(400);
+    eq((await page.locator(".plan-day").first().locator(".plan-time").first()
+         .textContent()).trim(), "07:05", "   취소해도 그대로");
+  }
+
   /* 직접 고치기 — 빼기 */
   const before = await page.locator(".plan-day .plan-slots li").count();
   page.once("dialog", (d) => d.accept());

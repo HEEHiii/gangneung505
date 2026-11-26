@@ -1737,6 +1737,33 @@ async function editDay(dayIndex, slotIndex, act) {
   } else if (act === "drop") {
     if (!confirm(`"${slots[slotIndex].title}"을 일정에서 뺄까요?`)) return;
     slots.splice(slotIndex, 1);
+  } else if (act === "time") {
+    /* ★ 시간은 짜준 것이 어림이라 손으로 고칠 일이 많습니다.
+       기차 시간, 체크인 시간처럼 정해진 것이 있으니까요.
+
+       여기만 고치고 뒤 칸은 밀지 않습니다. 밀어주면 친절해 보이지만
+       "하나 고쳤더니 전부 바뀌는" 쪽이 더 놀랍고, 되돌리기도
+       어렵습니다. 순서가 꼬이면 ▲▼ 로 옮기면 됩니다. */
+    const now = String(slots[slotIndex].time || "");
+    const got = prompt(`"${slots[slotIndex].title}" 시간을 몇 시로 할까요? (예: 14:30)`, now);
+    if (got === null) return;                       // 취소
+
+    const t = String(got).trim();
+    if (t === "") {
+      slots[slotIndex] = { ...slots[slotIndex], time: "" };   // 비우기도 됩니다
+    } else {
+      const m = t.match(/^(\d{1,2})\s*[:시]?\s*(\d{1,2})?$/);
+      const hh = m ? Number(m[1]) : NaN;
+      const mm = m ? Number(m[2] || 0) : NaN;
+      if (!m || !(hh >= 0 && hh <= 23) || !(mm >= 0 && mm <= 59)) {
+        toast("시간은 14:30 처럼 적어주세요");
+        return;
+      }
+      slots[slotIndex] = {
+        ...slots[slotIndex],
+        time: `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`,
+      };
+    }
   } else {
     return;
   }
@@ -1793,7 +1820,8 @@ function renderPlan() {
         <ul class="plan-slots">
           ${slots.length ? slots.map((x, i) => `
             <li data-i="${i}">
-              <span class="plan-time">${esc(x.time || "")}</span>
+              <button type="button" class="plan-time" data-act="time"
+                      aria-label="${esc(x.title || "")} 시간 고치기">${esc(x.time || "--:--")}</button>
               <span class="plan-dot" aria-hidden="true"></span>
               <span class="plan-what">
                 <span class="plan-title">${esc(x.title || "")}</span>

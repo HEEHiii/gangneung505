@@ -1175,9 +1175,15 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
   font-family:"Gowun Dodum",system-ui,sans-serif;
   font-size:12px;color:var(--muted);font-weight:400;
 }
-.plan-slots{padding:10px 14px 12px}
+/* ★ 전에는 이 선택자가 두 번 있었습니다.
 
-.plan-slots{list-style:none;margin:0;padding:0}
+     .plan-slots{padding:10px 14px 12px}      ← 원래 여백
+     .plan-slots{list-style:none;margin:0;padding:0}   ← 뒤엣것이 이김
+
+   디자인 정리할 때 둘째 줄을 넣으면서 첫째 줄의 여백을 죽였습니다.
+   같은 선택자라 뒤엣것이 이기는데, 두 줄 떨어져 있어서 눈에 안
+   띄었습니다. 그래서 시간이 카드 왼쪽 끝에 붙어 있었습니다. */
+.plan-slots{list-style:none;margin:0;padding:10px 14px 12px}
 /* ★ 시간선 — 칸마다 선을 긋는 대신 점을 잇습니다.
    줄마다 가로선을 그으면 표처럼 보이고, 여행은 표가 아니라
    "이어지는 것" 입니다. */
@@ -1205,10 +1211,22 @@ main{max-width:var(--maxw);margin:0 auto;padding:22px var(--gutter) 60px}
   content:"";position:absolute;left:50%;top:16px;bottom:-13px;
   width:2px;background:var(--line);transform:translateX(-50%);
 }
+/* ★ 시간은 눌러서 고칩니다.
+
+   짜준 시간은 어림이라 손볼 일이 많습니다 — 기차 시간, 체크인
+   시간처럼 정해진 것이 있으니까요. 따로 연필 단추를 두는 대신
+   시간 자체를 누르게 했습니다. 고치려는 사람이 제일 먼저 짚는
+   곳이 그 숫자입니다. */
 .plan-time{
-  font-variant-numeric:tabular-nums;font-weight:700;font-size:13px;
-  color:var(--muted);padding-top:2px;
+  font:inherit;font-variant-numeric:tabular-nums;font-weight:700;font-size:13px;
+  color:var(--muted);
+  display:block;width:100%;text-align:left;
+  padding:3px 4px;margin:-3px -4px;
+  background:transparent;border:1px solid transparent;border-radius:7px;
+  cursor:pointer;
 }
+.plan-time:hover{border-color:var(--line-strong);color:var(--text)}
+.plan-time:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .plan-slots li:first-child .plan-time{color:var(--accent)}
 /* ★ 제목과 메모는 각각 한 줄입니다.
    둘 다 <span> 이라 그냥 두면 "강릉역 도착 도착 시간에 맞춰
